@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "LZX Reader",
+    "slug": "lzxreader",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#007AFF"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lzx.reader"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#007AFF"
+      },
+      "package": "com.lzx.reader"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-document-picker"
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ReaderState, FileItem, ThemeMode, CodeTheme } from '../types';
+
+export const useReaderStore = create<ReaderState>()(
+  persist(
+    (set, get) => ({
+      files: [],
+      currentFileId: null,
+      theme: 'light',
+      fontSize: 16,
+      codeTheme: 'github',
+      bookmarks: [],
+      recentFiles: [],
+
+      addFile: (file: FileItem) => {
+        set((state) => {
+          // 检查是否已存在相同文件
+          const existingIndex = state.files.findIndex((f) => f.id === file.id);
+          let files: FileItem[];
+          if (existingIndex >= 0) {
+            // 更新已有文件
+            files = state.files.map((f, i) => (i === existingIndex ? file : f));
+          } else {
+            files = [file, ...state.files];
+          }
+          // 更新最近文件列表
+          const recentFiles = [file.id, ...state.recentFiles.filter((id) => id !== file.id)].slice(0, 20);
+          return { files, currentFileId: file.id, recentFiles };
+        });
+      },
+
+      removeFile: (fileId: string) => {
+        set((state) => ({
+          files: state.files.filter((f) => f.id !== fileId),
+          bookmarks: state.bookmarks.filter((id) => id !== fileId),
+          recentFiles: state.recentFiles.filter((id) => id !== fileId),
+          currentFileId: state.currentFileId === fileId ? null : state.currentFileId,
+        }));
+      },
+
+      setCurrentFile: (fileId: string | null) => {
+        set((state) => {
+          if (fileId) {
+            const recentFiles = [fileId, ...state.recentFiles.filter((id) => id !== fileId)].slice(0, 20);
+            return { currentFileId: fileId, recentFiles };
+          }
+          return { currentFileId: null };
+        });
+      },
+
+      toggleTheme: () => {
+        set((state) => ({
+          theme: state.theme === 'light' ? 'dark' : 'light',
+        }));
+      },
+
+      setFontSize: (size: number) => {
+        set({ fontSize: Math.max(12, Math.min(28, size)) });
+      },
+
+      setCodeTheme: (theme: CodeTheme) => {
+        set({ codeTheme: theme });
+      },
+
+      toggleBookmark: (fileId: string) => {
+        set((state) => ({
+          bookmarks: state.bookmarks.includes(fileId)
+            ? state.bookmarks.filter((id) => id !== fileId)
+            : [...state.bookmarks, fileId],
+        }));
+      },
+
+      isBookmarked: (fileId: string) => {
+        return get().bookmarks.includes(fileId);
+      },
+
+      getCurrentFile: () => {
+        const state = get();
+        return state.files.find((f) => f.id === state.currentFileId) ?? null;
+      },
+
+      clearAll: () => {
+        set({ files: [], currentFileId: null, bookmarks: [], recentFiles: [] });
+      },
+    }),
+    {
+      name: 'lzx-reader-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      // 只持久化必要的数据，不持久化文件内容（太大了）
+      partialize: (state) => ({
+        theme: state.theme,
+        fontSize: state.fontSize,
+        codeTheme: state.codeTheme,
+        bookmarks: state.bookmarks,
+        recentFiles: state.recentFiles,
+        // 文件列表也持久化，但不包含content（太大了）
+        files: state.files.map((f) => ({ ...f, content: '' })),
+      }),
+    }
+  )
+);
