@@ -59,6 +59,83 @@ export function generateCodeHtml(
 </html>`;
 }
 
+// 生成 Mermaid 图表的 HTML
+export function generateMermaidHtml(code: string, isDark: boolean): string {
+  const theme = isDark ? 'dark' : 'default';
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 8px;
+      background: transparent;
+      display: flex;
+      justify-content: center;
+    }
+    .mermaid { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="mermaid">${escapeHtml(code)}</div>
+  <script>
+    try {
+      mermaid.initialize({ startOnLoad: true, theme: '${theme}' });
+    } catch(e) {
+      console.error('Mermaid error:', e);
+    }
+  </script>
+</body>
+</html>`;
+}
+
+// 生成 KaTeX 数学公式的 HTML
+export function generateKatexHtml(
+  formula: string,
+  isDark: boolean,
+  isBlock: boolean
+): string {
+  const textColor = isDark ? '#D4D4D4' : '#24292E';
+  const displayMode = isBlock ? 'true' : 'false';
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 4px;
+      background: transparent;
+      color: ${textColor};
+      font-size: 16px;
+    }
+    .formula { display: flex; justify-content: center; }
+  </style>
+</head>
+<body>
+  <span id="formula"></span>
+  <script>
+    try {
+      katex.render(${JSON.stringify(formula)}, document.getElementById('formula'), {
+        displayMode: ${displayMode},
+        throwOnError: false
+      });
+    } catch(e) {
+      console.error('KaTeX error:', e);
+    }
+  </script>
+</body>
+</html>`;
+}
+
 // 获取highlight.js主题URL
 function getHighlightThemeUrl(theme: CodeTheme): string {
   const urls: Record<CodeTheme, string> = {

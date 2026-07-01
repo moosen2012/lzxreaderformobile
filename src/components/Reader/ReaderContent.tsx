@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
   Share,
 } from 'react-native';
@@ -101,25 +100,18 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
     switch (currentFile.type) {
       case 'markdown':
         return (
-          <ScrollView
-            style={{ flex: 1, backgroundColor: theme.background }}
-            showsVerticalScrollIndicator={false}
+          <MarkdownRenderer
+            content={currentFile.content}
+            theme={theme}
+            fontSize={fontSize}
+            codeTheme={codeTheme}
+            isDark={isDark}
             onScroll={(e) => {
               setScrollOffset(e.nativeEvent.contentOffset.y);
               setContentHeight(e.nativeEvent.contentSize.height);
               setScrollHeight(e.nativeEvent.layoutMeasurement.height);
             }}
-            scrollEventThrottle={16}
-          >
-            <MarkdownRenderer
-              content={currentFile.content}
-              theme={theme}
-              fontSize={fontSize}
-              codeTheme={codeTheme}
-              isDark={isDark}
-            />
-            <View style={{ height: 40 }} />
-          </ScrollView>
+          />
         );
 
       case 'code':
