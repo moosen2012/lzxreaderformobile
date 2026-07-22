@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import type { Theme } from '../../styles/themes';
 import type { CodeTheme } from '../../types';
@@ -30,11 +30,24 @@ export const CodeRenderer: React.FC<CodeRendererProps> = ({
     [content, language, codeTheme, isDark]
   );
 
-  return <View style={styles.container}>{html}</View>;
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.content}>
+        {html}
+      </View>
+    </ScrollView>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
+    padding: 16,
+    minHeight: 100,
   },
 });
