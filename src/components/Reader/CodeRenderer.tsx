@@ -15,6 +15,7 @@ interface CodeRendererProps {
 export const CodeRenderer: React.FC<CodeRendererProps> = ({
   content,
   language,
+  theme,
   codeTheme,
   isDark,
 }) => {

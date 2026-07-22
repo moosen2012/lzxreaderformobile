@@ -137,7 +137,7 @@ export function generateKatexHtml(
 }
 
 // 获取highlight.js主题URL
-function getHighlightThemeUrl(theme: CodeTheme): string {
+export function getHighlightThemeUrl(theme: CodeTheme): string {
   const urls: Record<CodeTheme, string> = {
     github: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css',
     monokai: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai.min.css',
@@ -148,7 +148,7 @@ function getHighlightThemeUrl(theme: CodeTheme): string {
 }
 
 // 获取代码背景色
-function getHighlightBgColor(theme: CodeTheme, isDark: boolean): string {
+export function getHighlightBgColor(theme: CodeTheme, isDark: boolean): string {
   const colors: Record<CodeTheme, string> = {
     github: isDark ? '#0D1117' : '#F6F8FA',
     monokai: '#272822',
@@ -159,7 +159,7 @@ function getHighlightBgColor(theme: CodeTheme, isDark: boolean): string {
 }
 
 // 转义HTML
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

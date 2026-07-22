@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ReaderState, FileItem, ThemeMode, CodeTheme } from '../types';
 
@@ -88,15 +89,16 @@ export const useReaderStore = create<ReaderState>()(
     {
       name: 'lzx-reader-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      // 只持久化必要的数据，不持久化文件内容（太大了）
+      // 只持久化必要的数据；原生平台不持久化 content（通过 uri 重新读取），web 平台保留 content（没有本地 uri 可重读）
       partialize: (state) => ({
         theme: state.theme,
         fontSize: state.fontSize,
         codeTheme: state.codeTheme,
         bookmarks: state.bookmarks,
         recentFiles: state.recentFiles,
-        // 文件列表也持久化，但不包含content（太大了）
-        files: state.files.map((f) => ({ ...f, content: '' })),
+        files: Platform.OS === 'web'
+          ? state.files
+          : state.files.map((f) => ({ ...f, content: '' })),
       }),
     }
   )

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Share,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
 import { useReaderStore } from '../../store/readerStore';
 import { getTheme } from '../../styles/themes';
 import { getLanguage } from '../../utils/fileHelper';
@@ -33,12 +35,14 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
     toggleTheme,
     setFontSize,
     setCodeTheme,
+    addFile,
   } = useReaderStore();
 
   const [showSettings, setShowSettings] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [scrollHeight, setScrollHeight] = useState(0);
+  const [isReloading, setIsReloading] = useState(false);
 
   const theme = getTheme(themeMode);
   const isDark = themeMode === 'dark';
@@ -51,6 +55,32 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
 
   const isBookmarked = fileId ? bookmarks.includes(fileId) : false;
   const language = currentFile ? getLanguage(currentFile.name) : 'plaintext';
+
+  // 如果文件内容为空，尝试重新读取（针对持久化后 content 丢失的情况）
+  useEffect(() => {
+    async function reloadContent() {
+      if (!currentFile || currentFile.content !== '' || isReloading) return;
+      // Web 平台没有本地 URI 可重新读取
+      if (Platform.OS === 'web') return;
+      // 没有有效的本地 URI
+      if (!currentFile.uri) return;
+
+      setIsReloading(true);
+      try {
+        const content = await FileSystem.readAsStringAsync(currentFile.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        // 更新文件内容
+        addFile({ ...currentFile, content });
+      } catch {
+        // 读取失败，静默处理
+      } finally {
+        setIsReloading(false);
+      }
+    }
+
+    reloadContent();
+  }, [currentFile, addFile, isReloading]);
 
   // 阅读进度
   const progress = useMemo(() => {
@@ -86,12 +116,24 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
       );
     }
 
-    if (!currentFile.content) {
+    if (!currentFile.content && currentFile.content !== '') {
       return (
         <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
             正在加载文件内容...
+          </Text>
+        </View>
+      );
+    }
+
+    // 内容为空字符串时显示提示
+    if (currentFile.content === '') {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
+          <Ionicons name="document-text-outline" size={48} color={theme.textTertiary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            文件内容为空
           </Text>
         </View>
       );
