@@ -1,13 +1,12 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import WebView from 'react-native-webview';
-import hljs from 'highlight.js';
 import type { CodeTheme } from '../../types';
 import {
   generateCodeHtml,
-  getHighlightThemeUrl,
+  highlightCode,
+  getHighlightThemeCss,
   getHighlightBgColor,
-  escapeHtml,
 } from '../../utils/markdownHelper';
 
 interface CodeBlockProps {
@@ -15,23 +14,26 @@ interface CodeBlockProps {
   language: string;
   codeTheme: CodeTheme;
   isDark: boolean;
+  wordWrap?: boolean;
 }
 
 // Web 平台专用渲染：react-native-webview 不支持 web，直接用 highlight.js 生成高亮 HTML
-const WebCodeBlock: React.FC<CodeBlockProps> = ({ code, language, codeTheme, isDark }) => {
-  const highlightedCode = useMemo(() => {
-    try {
-      if (language === 'plaintext' || !language) {
-        return escapeHtml(code);
-      }
-      return hljs.highlight(code, { language, ignoreIllegals: true }).value;
-    } catch {
-      return escapeHtml(code);
-    }
-  }, [code, language]);
+const WebCodeBlock: React.FC<CodeBlockProps> = ({ code, language, codeTheme, isDark, wordWrap = false }) => {
+  const highlightedCode = useMemo(
+    () => highlightCode(code, language),
+    [code, language]
+  );
 
   const bgColor = getHighlightBgColor(codeTheme, isDark);
   const textColor = isDark ? '#D4D4D4' : '#24292E';
+  const themeCss = getHighlightThemeCss(codeTheme);
+
+  const preStyle = wordWrap
+    ? 'overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;'
+    : 'overflow-x:auto;white-space:pre;';
+  const codeStyle = wordWrap
+    ? 'padding:0;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;'
+    : 'padding:0;white-space:pre;';
 
   // web 平台直接返回原生 div，用 dangerouslySetInnerHTML 注入高亮 HTML
   return React.createElement('div', {
@@ -43,8 +45,8 @@ const WebCodeBlock: React.FC<CodeBlockProps> = ({ code, language, codeTheme, isD
     },
     dangerouslySetInnerHTML: {
       __html: `
-        <link rel="stylesheet" href="${getHighlightThemeUrl(codeTheme)}">
-        <pre style="margin:0;padding:16px;overflow-x:auto;background:${bgColor};color:${textColor};font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;line-height:1.6;white-space:pre;min-height:100px;"><code class="hljs">${highlightedCode}</code></pre>
+        <style>${themeCss}</style>
+        <pre style="margin:0;padding:16px;background:${bgColor};color:${textColor};font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;line-height:1.6;min-height:100px;${preStyle}"><code class="hljs" style="${codeStyle}">${highlightedCode}</code></pre>
       `,
     },
   });
@@ -62,9 +64,9 @@ const HEIGHT_DETECTION_SCRIPT = `
     }
     // 初始发送
     sendHeight();
-    // highlight.js 渲染完成后可能改变高度，延迟再发一次
-    setTimeout(sendHeight, 100);
-    setTimeout(sendHeight, 300);
+    // 预高亮后内容为静态 HTML，少量延迟即可获取准确高度
+    setTimeout(sendHeight, 50);
+    setTimeout(sendHeight, 150);
     // 窗口大小变化时也重新发送
     window.addEventListener('resize', sendHeight);
   })();
@@ -73,18 +75,18 @@ const HEIGHT_DETECTION_SCRIPT = `
 
 const MIN_HEIGHT = 200;
 
-export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language, codeTheme, isDark }) => {
+export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language, codeTheme, isDark, wordWrap = false }) => {
   // Web 平台使用原生 HTML 渲染，避免 react-native-webview 不支持 web 导致空白
   if (Platform.OS === 'web') {
-    return <WebCodeBlock code={code} language={language} codeTheme={codeTheme} isDark={isDark} />;
+    return <WebCodeBlock code={code} language={language} codeTheme={codeTheme} isDark={isDark} wordWrap={wordWrap} />;
   }
 
   const [webViewHeight, setWebViewHeight] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   const html = useMemo(
-    () => generateCodeHtml(code, language, codeTheme, isDark),
-    [code, language, codeTheme, isDark]
+    () => generateCodeHtml(code, language, codeTheme, isDark, wordWrap),
+    [code, language, codeTheme, isDark, wordWrap]
   );
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
@@ -123,7 +125,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language,
     </View>
   );
 }, (prev, next) => {
-  return prev.code === next.code && prev.language === next.language && prev.codeTheme === next.codeTheme && prev.isDark === next.isDark;
+  return prev.code === next.code && prev.language === next.language && prev.codeTheme === next.codeTheme && prev.isDark === next.isDark && prev.wordWrap === next.wordWrap;
 });
 
 CodeBlock.displayName = 'CodeBlock';
