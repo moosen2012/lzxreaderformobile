@@ -20,6 +20,15 @@ export interface FileItem {
   directory?: string;      // 文件所在目录路径（用于显示）
 }
 
+// 目录树节点接口
+export interface TreeNode {
+  name: string;             // 文件/目录名
+  path: string;             // 相对路径（如 "docs/api/readme.md"）
+  isDirectory: boolean;
+  fileId?: string;          // 文件节点引用 FileItem.id
+  children: TreeNode[];     // 子节点（目录才有）
+}
+
 // 渲染状态接口
 export interface RenderState {
   isLoading: boolean;
@@ -40,6 +49,7 @@ export interface ReaderState {
 
   // Actions
   addFile: (file: FileItem) => void;
+  addFiles: (files: FileItem[]) => void;  // 批量添加文件
   removeFile: (fileId: string) => void;
   setCurrentFile: (fileId: string | null) => void;
   toggleTheme: () => void;

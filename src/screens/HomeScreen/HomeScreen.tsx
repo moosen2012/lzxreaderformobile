@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useReaderStore } from '../../store/readerStore';
 import { useFilePicker } from '../../hooks/useFilePicker';
+import { useDirectoryImporter } from '../../hooks/useDirectoryImporter';
 import { useResponsive } from '../../utils/responsive';
 import { getTheme } from '../../styles/themes';
 import { FileList } from '../../components/FileList/FileList';
@@ -33,6 +34,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   } = useReaderStore();
 
   const { pickFile } = useFilePicker();
+  const { importDirectory } = useDirectoryImporter();
   const { useSplitView, fileListWidth, readerWidth } = useResponsive();
   const theme = getTheme(themeMode);
 
@@ -95,6 +97,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     []
   );
 
+  // 处理导入目录
+  const handleImportDirectory = useCallback(async () => {
+    const result = await importDirectory();
+    if (!result.success) {
+      if (result.error && result.error !== 'cancelled') {
+        Alert.alert('导入失败', result.error);
+      }
+      return;
+    }
+    Alert.alert(
+      '导入成功',
+      `已从「${result.rootName}」导入 ${result.count} 个文件`
+    );
+  }, [importDirectory]);
+
   // 平板分屏布局
   if (useSplitView) {
     return (
@@ -117,6 +134,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             onFileDelete={handleFileDelete}
             onFileToggleBookmark={handleToggleBookmark}
             onAddFile={handleAddFile}
+            onImportDirectory={handleImportDirectory}
             onPressDirectory={handlePressDirectory}
           />
         </View>
@@ -165,6 +183,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         onFileDelete={handleFileDelete}
         onFileToggleBookmark={handleToggleBookmark}
         onAddFile={handleAddFile}
+        onImportDirectory={handleImportDirectory}
         onPressDirectory={handlePressDirectory}
       />
     </View>

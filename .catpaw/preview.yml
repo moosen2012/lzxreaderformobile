@@ -1,1 +1,1 @@
-ignored_ports: '8081'
+ignored_ports: 8081,8082

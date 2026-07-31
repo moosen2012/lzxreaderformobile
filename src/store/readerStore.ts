@@ -32,6 +32,31 @@ export const useReaderStore = create<ReaderState>()(
         });
       },
 
+      addFiles: (newFiles: FileItem[]) => {
+        if (newFiles.length === 0) return;
+        set((state) => {
+          // 用 Map 去重：新文件覆盖旧文件
+          const fileMap = new Map<string, FileItem>();
+          // 先放入已有文件
+          for (const f of state.files) fileMap.set(f.id, f);
+          // 再放入新文件（覆盖同 id 的）
+          for (const f of newFiles) fileMap.set(f.id, f);
+          const files = Array.from(fileMap.values());
+          // 更新最近文件列表
+          const newIds = newFiles.map((f) => f.id);
+          const recentFiles = [
+            ...newIds,
+            ...state.recentFiles.filter((id) => !newIds.includes(id)),
+          ].slice(0, 20);
+          return {
+            files,
+            recentFiles,
+            // 如果当前没有选中文件，选中第一个新文件
+            currentFileId: state.currentFileId ?? newFiles[0].id,
+          };
+        });
+      },
+
       removeFile: (fileId: string) => {
         set((state) => ({
           files: state.files.filter((f) => f.id !== fileId),

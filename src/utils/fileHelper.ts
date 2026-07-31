@@ -1,4 +1,5 @@
 import type { FileType } from '../types';
+import type { FileItem, TreeNode } from '../types';
 
 // 文件扩展名到文件类型的映射
 const EXTENSION_MAP: Record<string, FileType> = {
@@ -269,4 +270,100 @@ export function extractDirectory(uri: string, name: string): string {
 
   // 最多取最后 3 级有意义目录，避免路径过长
   return meaningfulSegments.slice(-3).join('/');
+}
+
+// 支持的文件扩展名集合
+const SUPPORTED_EXTENSIONS = new Set(Object.keys(EXTENSION_MAP));
+
+/**
+ * 判断文件是否为应用支持的类型（md/txt/code 等）。
+ */
+export function isSupportedFile(fileName: string): boolean {
+  const ext = getExtension(fileName);
+  return SUPPORTED_EXTENSIONS.has(ext);
+}
+
+/**
+ * 从 files 数组按 directory 字段构建目录树。
+ *
+ * 有 directory 字段的文件按路径段构建嵌套树；
+ * 无 directory 字段的文件作为根级文件节点。
+ *
+ * @param files 文件数组
+ * @returns     目录树根节点数组
+ */
+export function buildFileTree(files: FileItem[]): TreeNode[] {
+  // 收集所有有 directory 的文件，按 directory 分组
+  // 同时保留无 directory 的文件作为顶层节点
+  const rootChildren: TreeNode[] = [];
+  // 用 Map 保存已创建的目录节点，key 为相对路径
+  const dirNodeMap = new Map<string, TreeNode>();
+
+  // 确保 / 分隔符
+  const normalize = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '');
+
+  for (const file of files) {
+    const dir = file.directory ? normalize(file.directory) : '';
+
+    if (!dir) {
+      // 无目录 → 顶层文件节点
+      rootChildren.push({
+        name: file.name,
+        path: file.name,
+        isDirectory: false,
+        fileId: file.id,
+        children: [],
+      });
+      continue;
+    }
+
+    // 确保 directory 路径的所有父级目录节点都已创建
+    const segments = dir.split('/').filter((s) => s.length > 0);
+    let currentPath = '';
+    let parentChildren = rootChildren;
+
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      currentPath = currentPath ? `${currentPath}/${seg}` : seg;
+
+      if (dirNodeMap.has(currentPath)) {
+        parentChildren = dirNodeMap.get(currentPath)!.children;
+        continue;
+      }
+
+      const node: TreeNode = {
+        name: seg,
+        path: currentPath,
+        isDirectory: true,
+        children: [],
+      };
+      dirNodeMap.set(currentPath, node);
+      parentChildren.push(node);
+      parentChildren = node.children;
+    }
+
+    // 在最深层目录中添加文件节点
+    const dirNode = dirNodeMap.get(dir)!;
+    dirNode.children.push({
+      name: file.name,
+      path: `${dir}/${file.name}`,
+      isDirectory: false,
+      fileId: file.id,
+      children: [],
+    });
+  }
+
+  // 排序：目录在前，文件在后，各自按名称排序
+  const sortTree = (nodes: TreeNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+      return a.name.localeCompare(b.name, 'zh-CN');
+    });
+    for (const n of nodes) {
+      if (n.isDirectory) sortTree(n.children);
+    }
+  };
+  sortTree(rootChildren);
+
+  return rootChildren;
 }
