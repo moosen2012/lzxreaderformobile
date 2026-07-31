@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useReaderStore } from '../../store/readerStore';
 import { useFilePicker } from '../../hooks/useFilePicker';
@@ -78,6 +78,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     [toggleBookmark]
   );
 
+  // 处理目录点击
+  const handlePressDirectory = useCallback(
+    (file: FileItem) => {
+      if (!file.directory) return;
+      Alert.alert(
+        '文件目录',
+        file.directory,
+        [
+          { text: '复制路径', onPress: () => { Clipboard.setString(file.directory || ''); } },
+          { text: '关闭', style: 'cancel' },
+        ],
+        { cancelable: true }
+      );
+    },
+    []
+  );
+
   // 平板分屏布局
   if (useSplitView) {
     return (
@@ -100,6 +117,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             onFileDelete={handleFileDelete}
             onFileToggleBookmark={handleToggleBookmark}
             onAddFile={handleAddFile}
+            onPressDirectory={handlePressDirectory}
           />
         </View>
 
@@ -147,6 +165,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         onFileDelete={handleFileDelete}
         onFileToggleBookmark={handleToggleBookmark}
         onAddFile={handleAddFile}
+        onPressDirectory={handlePressDirectory}
       />
     </View>
   );

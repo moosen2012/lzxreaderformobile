@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { useReaderStore } from '../store/readerStore';
-import { getFileType, isFileTooLarge, MAX_FILE_SIZE } from '../utils/fileHelper';
+import { getFileType, isFileTooLarge, MAX_FILE_SIZE, extractDirectory } from '../utils/fileHelper';
 import type { FileItem } from '../types';
 
 // Web 平台文件选择：使用 HTML input 元素
@@ -74,6 +74,7 @@ export function useFilePicker() {
             size: result.size,
             lastModified: Date.now(),
             addedAt: Date.now(),
+            directory: '',
           };
 
           addFile(fileItem);
@@ -133,6 +134,7 @@ export function useFilePicker() {
         size: asset.size,
         lastModified: Date.now(),
         addedAt: Date.now(),
+        directory: extractDirectory(asset.uri, asset.name),
       };
 
       addFile(fileItem);

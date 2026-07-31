@@ -14,6 +14,7 @@ interface FileListItemProps {
   onLongPress?: (file: FileItem) => void;
   onDelete?: (file: FileItem) => void;
   onToggleBookmark?: (file: FileItem) => void;
+  onPressDirectory?: (file: FileItem) => void;
 }
 
 export const FileListItem: React.FC<FileListItemProps> = ({
@@ -25,6 +26,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onLongPress,
   onDelete,
   onToggleBookmark,
+  onPressDirectory,
 }) => {
   const handleLongPress = () => {
     if (onLongPress) {
@@ -90,6 +92,24 @@ export const FileListItem: React.FC<FileListItemProps> = ({
             </Text>
           ) : null}
           {file.size ? <Text style={[styles.metaDot, { color: theme.textTertiary }]}>·</Text> : null}
+          {file.directory ? (
+            <>
+              <Text style={[styles.metaDot, { color: theme.textTertiary }]}>·</Text>
+              <TouchableOpacity
+                style={styles.directoryLink}
+                onPress={() => onPressDirectory?.(file)}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel={`目录: ${file.directory}`}
+              >
+                <Ionicons name="folder-outline" size={11} color={theme.primary} />
+                <Text style={[styles.directoryText, { color: theme.primary }]} numberOfLines={1}>
+                  {file.directory}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+          {file.directory || file.size ? <Text style={[styles.metaDot, { color: theme.textTertiary }]}>·</Text> : null}
           <Text style={[styles.metaText, { color: theme.textTertiary }]}>
             {formatDate(file.addedAt)}
           </Text>
@@ -141,6 +161,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   metaDot: {
+    fontSize: 12,
+  },
+  directoryLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    maxWidth: 140,
+  },
+  directoryText: {
     fontSize: 12,
   },
   bookmarkContainer: {

@@ -17,6 +17,7 @@ export interface FileItem {
   size?: number;           // 文件大小（字节）
   lastModified?: number;   // 最后修改时间戳
   addedAt: number;         // 添加到应用的时间戳
+  directory?: string;      // 文件所在目录路径（用于显示）
 }
 
 // 渲染状态接口

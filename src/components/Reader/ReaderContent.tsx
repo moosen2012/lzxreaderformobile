@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Share,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
@@ -251,6 +252,41 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
         </View>
       )}
 
+      {/* 面包屑导航 */}
+      {currentFile?.directory ? (
+        <View style={[styles.breadcrumbBar, { backgroundColor: theme.headerBackground, borderBottomColor: theme.separator }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.breadcrumbContent}
+          >
+            <TouchableOpacity
+              style={styles.breadcrumbItem}
+              onPress={onBack}
+              accessibilityRole="button"
+              accessibilityLabel="返回首页"
+            >
+              <Ionicons name="home-outline" size={13} color={theme.textSecondary} />
+            </TouchableOpacity>
+            {currentFile.directory.split('/').map((segment, idx, arr) => (
+              <React.Fragment key={idx}>
+                <Ionicons name="chevron-forward" size={12} color={theme.textTertiary} />
+                <Text
+                  style={[styles.breadcrumbText, { color: idx === arr.length - 1 ? theme.textSecondary : theme.textTertiary }]}
+                  numberOfLines={1}
+                >
+                  {segment}
+                </Text>
+              </React.Fragment>
+            ))}
+            <Ionicons name="chevron-forward" size={12} color={theme.textTertiary} />
+            <Text style={[styles.breadcrumbText, { color: theme.primary, fontWeight: '500' }]} numberOfLines={1}>
+              {currentFile.name}
+            </Text>
+          </ScrollView>
+        </View>
+      ) : null}
+
       {/* 内容区域 */}
       {renderContent()}
 
@@ -306,6 +342,23 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
+  },
+  breadcrumbBar: {
+    height: 32,
+    width: '100%',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  breadcrumbContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  breadcrumbItem: {
+    padding: 2,
+  },
+  breadcrumbText: {
+    fontSize: 12,
   },
   emptyContainer: {
     flex: 1,

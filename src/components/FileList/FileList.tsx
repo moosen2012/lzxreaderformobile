@@ -14,6 +14,7 @@ interface FileListProps {
   onFileDelete: (file: FileItem) => void;
   onFileToggleBookmark: (file: FileItem) => void;
   onAddFile: () => void;
+  onPressDirectory?: (file: FileItem) => void;
   refreshing?: boolean;
   onRefresh?: () => void;
 }
@@ -27,6 +28,7 @@ export const FileList: React.FC<FileListProps> = ({
   onFileDelete,
   onFileToggleBookmark,
   onAddFile,
+  onPressDirectory,
   refreshing = false,
   onRefresh,
 }) => {
@@ -40,9 +42,10 @@ export const FileList: React.FC<FileListProps> = ({
         onPress={onFilePress}
         onDelete={onFileDelete}
         onToggleBookmark={onFileToggleBookmark}
+        onPressDirectory={onPressDirectory}
       />
     ),
-    [theme, currentFileId, bookmarks, onFilePress, onFileDelete, onFileToggleBookmark]
+    [theme, currentFileId, bookmarks, onFilePress, onFileDelete, onFileToggleBookmark, onPressDirectory]
   );
 
   const keyExtractor = useCallback((item: FileItem) => item.id, []);
