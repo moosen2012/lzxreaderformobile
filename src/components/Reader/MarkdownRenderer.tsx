@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import {
   StyleSheet,
+  View,
+  type ViewStyle,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
@@ -9,7 +11,8 @@ import type { Theme } from '../../styles/themes';
 import type { CodeTheme } from '../../types';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { MermaidBlock } from '../MermaidBlock/MermaidBlock';
-import { KatexBlock } from '../KatexBlock/KatexBlock';
+import { MathBlock, isInlineMathNode } from '../MathBlock/MathBlock';
+import { preprocessMarkdown, INLINE_MATH_MARKER } from '../../utils/markdownPreprocess';
 
 interface MarkdownRendererProps {
   content: string;
@@ -20,48 +23,53 @@ interface MarkdownRendererProps {
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }
 
-// 预处理 Markdown：剥离 frontmatter、转换 LaTeX 公式为代码块标记
-function preprocessMarkdown(content: string): string {
-  // 1. 剥离 YAML frontmatter
-  let result = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
-  // 2. 块级公式 $$...$$ → katex 代码块
-  result = result.replace(
-    /\$\$([\s\S]+?)\$\$/g,
-    (_, math) => `\`\`\`katex\n${math.trim()}\n\`\`\``
-  );
-  // 3. 行内公式 $...$ → 带标记的行内代码
-  result = result.replace(
-    /\$([^\n$]+?)\$/g,
-    (_, math) => `\`$KATEX$${math}\``
-  );
-  return result;
-}
+/** 含行内公式的段落需要横向流式排版，否则公式会被挤到单独一行 */
+const INLINE_FLOW_STYLE: ViewStyle = {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+};
 
-// 自定义渲染器：拦截 code/codespan 实现代码高亮、Mermaid 图表、KaTeX 公式
+// 自定义渲染器：拦截 code/codespan 实现代码高亮、Mermaid 图表、数学公式
 class CustomRenderer extends Renderer {
   private codeTheme: CodeTheme;
   private isDark: boolean;
+  private fontSize: number;
+  private theme: Theme;
 
-  constructor(codeTheme: CodeTheme, isDark: boolean) {
+  constructor(codeTheme: CodeTheme, isDark: boolean, fontSize: number, theme: Theme) {
     super();
     this.codeTheme = codeTheme;
     this.isDark = isDark;
+    this.fontSize = fontSize;
+    this.theme = theme;
   }
 
   override code(
     text: string,
     language?: string,
     _containerStyle?: unknown,
-    _textStyle?: unknown,
+    _textStyle?: unknown
   ): React.ReactNode {
     const key = this.getKey();
 
     if (language === 'mermaid') {
-      return <MermaidBlock key={key} code={text} isDark={this.isDark} />;
+      return (
+        <MermaidBlock
+          key={key}
+          code={text}
+          isDark={this.isDark}
+          textColor={this.theme.text}
+          backgroundColor={this.theme.codeBackground}
+          borderColor={this.theme.border}
+        />
+      );
     }
 
-    if (language === 'katex') {
-      return <KatexBlock key={key} formula={text} isDark={this.isDark} isBlock />;
+    if (language === 'katex' || language === 'math' || language === 'tex') {
+      return (
+        <MathBlock key={key} formula={text} fontSize={this.fontSize} color={this.theme.text} />
+      );
     }
 
     return (
@@ -76,18 +84,31 @@ class CustomRenderer extends Renderer {
   }
 
   override codespan(text: string, styles?: unknown): React.ReactNode {
-    if (text.startsWith('$KATEX$')) {
-      const formula = text.slice(7);
+    if (text.startsWith(INLINE_MATH_MARKER)) {
       return (
-        <KatexBlock
+        <MathBlock
           key={this.getKey()}
-          formula={formula}
-          isDark={this.isDark}
-          isBlock={false}
+          formula={text.slice(INLINE_MATH_MARKER.length)}
+          fontSize={this.fontSize}
+          color={this.theme.text}
+          inline
         />
       );
     }
-    return super.codespan(text, styles as any);
+    return super.codespan(text, styles as never);
+  }
+
+  /**
+   * 段落里一旦有行内公式，就把默认的纵向布局切成横向流式布局，
+   * 这样"设 f(x) 为..."这类句子的文字和公式就能排在同一行。
+   */
+  override paragraph(children: React.ReactNode[], styles?: ViewStyle): React.ReactNode {
+    const hasInlineMath = children.some(isInlineMathNode);
+    return (
+      <View key={this.getKey()} style={hasInlineMath ? [styles, INLINE_FLOW_STYLE] : styles}>
+        {children}
+      </View>
+    );
   }
 }
 
@@ -99,14 +120,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   isDark,
   onScroll,
 }) => {
-  const processedContent = useMemo(
-    () => preprocessMarkdown(content),
-    [content]
-  );
+  const processedContent = useMemo(() => preprocessMarkdown(content), [content]);
 
   const renderer = useMemo(
-    () => new CustomRenderer(codeTheme, isDark),
-    [codeTheme, isDark]
+    () => new CustomRenderer(codeTheme, isDark, fontSize, theme),
+    [codeTheme, isDark, fontSize, theme]
   );
 
   const markedStyles = useMemo(
@@ -253,7 +271,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         borderRadius: 8,
         marginVertical: 8,
       },
-    }) as any,
+    }),
     [theme, fontSize]
   );
 
@@ -272,12 +290,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   return (
     <Markdown
       value={processedContent}
-      styles={markedStyles}
+      styles={markedStyles as never}
       theme={userTheme}
       renderer={renderer}
       flatListProps={{
         onScroll,
-        scrollEventThrottle: 16,
+        scrollEventThrottle: 32,
         contentContainerStyle: { padding: 16 },
         showsVerticalScrollIndicator: false,
         style: { backgroundColor: theme.background },

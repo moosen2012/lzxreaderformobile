@@ -1,5 +1,9 @@
 # ReaderScreen（阅读器）功能详细设计
 
+> 状态：**已过时**。`ReaderScreen` 路由已删除，阅读器改成文件浏览器右栏的内容形态
+> （`ReaderContent` 保留，去掉 `isEmbedded`，由 `onBack` 控制返回目录）。最新设计见 `file-browser.md`。
+
+
 ## 1. 页面概述
 
 阅读器页面是应用的核心页面，用于展示文件内容，支持 Markdown 渲染和代码语法高亮。

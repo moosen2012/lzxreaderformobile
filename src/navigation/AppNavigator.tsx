@@ -4,12 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useReaderStore } from '../store/readerStore';
 import { getTheme } from '../styles/themes';
 import { HomeScreen } from '../screens/HomeScreen/HomeScreen';
-import { ReaderScreen } from '../screens/ReaderScreen/ReaderScreen';
-
-export type RootStackParamList = {
-  Home: undefined;
-  Reader: { fileId: string };
-};
+import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -40,7 +35,6 @@ export const AppNavigator: React.FC = () => {
         }}
       >
         <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Reader" component={ReaderScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

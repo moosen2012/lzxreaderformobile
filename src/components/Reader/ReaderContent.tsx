@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Share,
   Platform,
   ScrollView,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
@@ -21,75 +23,78 @@ import { SettingsPanel } from '../../components/SettingsPanel/SettingsPanel';
 
 interface ReaderContentProps {
   fileId: string | undefined;
+  /** 提供时在头部显示返回按钮（文件浏览器右栏用它回到目录内容） */
   onBack?: () => void;
-  isEmbedded?: boolean;
 }
 
-export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, isEmbedded = false }) => {
-  const {
-    files,
-    theme: themeMode,
-    fontSize,
-    codeTheme,
-    bookmarks,
-    toggleBookmark,
-    toggleTheme,
-    setFontSize,
-    setCodeTheme,
-    addFile,
-  } = useReaderStore();
+export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack }) => {
+  // 逐字段订阅：避免 files/bookmarks 之外的字段变化（比如主题、字号）引起整块重渲染
+  const currentFile = useReaderStore((state) => state.files.find((f) => f.id === fileId) ?? null);
+  const themeMode = useReaderStore((state) => state.theme);
+  const fontSize = useReaderStore((state) => state.fontSize);
+  const codeTheme = useReaderStore((state) => state.codeTheme);
+  const isBookmarked = useReaderStore((state) => (fileId ? state.bookmarks.includes(fileId) : false));
+  const toggleBookmark = useReaderStore((state) => state.toggleBookmark);
+  const toggleTheme = useReaderStore((state) => state.toggleTheme);
+  const setFontSize = useReaderStore((state) => state.setFontSize);
+  const setCodeTheme = useReaderStore((state) => state.setCodeTheme);
+  const updateFileContent = useReaderStore((state) => state.updateFileContent);
 
   const [showSettings, setShowSettings] = useState(false);
-  const [scrollOffset, setScrollOffset] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [scrollHeight, setScrollHeight] = useState(0);
   const [isReloading, setIsReloading] = useState(false);
+  const [reloadError, setReloadError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
   const theme = getTheme(themeMode);
   const isDark = themeMode === 'dark';
 
-  // 获取当前文件
-  const currentFile = useMemo(
-    () => files.find((f) => f.id === fileId) ?? null,
-    [files, fileId]
-  );
-
-  const isBookmarked = fileId ? bookmarks.includes(fileId) : false;
   const language = currentFile ? getLanguage(currentFile.name) : 'plaintext';
 
   // 如果文件内容为空，尝试重新读取（针对持久化后 content 丢失的情况）
   useEffect(() => {
-    async function reloadContent() {
-      if (!currentFile || currentFile.content !== '' || isReloading) return;
-      // Web 平台没有本地 URI 可重新读取
-      if (Platform.OS === 'web') return;
-      // 没有有效的本地 URI
-      if (!currentFile.uri) return;
+    if (!currentFile) return;
+    if (currentFile.content !== '') return;
+    if (Platform.OS === 'web' || !currentFile.uri) return;
 
-      setIsReloading(true);
+    let cancelled = false;
+    setIsReloading(true);
+    setReloadError(null);
+
+    (async () => {
       try {
         const content = await FileSystem.readAsStringAsync(currentFile.uri, {
           encoding: FileSystem.EncodingType.UTF8,
         });
-        // 更新文件内容
-        addFile({ ...currentFile, content });
+        if (cancelled) return;
+        if (content) {
+          // 只回填内容，不改变 currentFileId（分屏下否则会把用户正在读的文件切走）
+          updateFileContent(currentFile.id, content);
+        } else {
+          setReloadError('文件内容为空');
+        }
       } catch {
-        // 读取失败，静默处理
+        if (!cancelled) setReloadError('无法读取文件内容，文件可能已被移动或删除');
       } finally {
-        setIsReloading(false);
+        if (!cancelled) setIsReloading(false);
       }
-    }
+    })();
 
-    reloadContent();
-  }, [currentFile, addFile, isReloading]);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentFile, updateFileContent]);
 
-  // 阅读进度
-  const progress = useMemo(() => {
-    if (contentHeight === 0 || scrollHeight === 0) return 0;
-    const maxScroll = contentHeight - scrollHeight;
-    if (maxScroll <= 0) return 100;
-    return Math.min(100, Math.max(0, (scrollOffset / maxScroll) * 100));
-  }, [scrollOffset, contentHeight, scrollHeight]);
+  /**
+   * 滚动进度：滚动事件 16ms 一次，直接 setState 会让整棵阅读器每秒重渲染几十次。
+   * 这里只在整数百分比发生变化时才更新。
+   */
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const maxScroll = contentSize.height - layoutMeasurement.height;
+    const ratio = maxScroll <= 0 ? 100 : (contentOffset.y / maxScroll) * 100;
+    const rounded = Math.min(100, Math.max(0, Math.round(ratio)));
+    setProgress((prev) => (prev === rounded ? prev : rounded));
+  }, []);
 
   // 分享文件
   const handleShare = useCallback(async () => {
@@ -99,25 +104,22 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
         message: currentFile.content,
         title: currentFile.name,
       });
-    } catch (error) {
-      // 忽略分享错误
+    } catch {
+      // 用户取消分享，忽略
     }
   }, [currentFile]);
 
-  // 渲染内容
   const renderContent = () => {
     if (!currentFile) {
       return (
         <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
           <Ionicons name="alert-circle-outline" size={48} color={theme.textTertiary} />
-          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            文件未找到
-          </Text>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>文件未找到</Text>
         </View>
       );
     }
 
-    if (!currentFile.content && currentFile.content !== '') {
+    if (isReloading) {
       return (
         <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
           <ActivityIndicator size="large" color={theme.primary} />
@@ -128,13 +130,12 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
       );
     }
 
-    // 内容为空字符串时显示提示
-    if (currentFile.content === '') {
+    if (!currentFile.content) {
       return (
         <View style={[styles.emptyContainer, { backgroundColor: theme.background }]}>
           <Ionicons name="document-text-outline" size={48} color={theme.textTertiary} />
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            文件内容为空
+            {reloadError ?? '文件内容为空'}
           </Text>
         </View>
       );
@@ -149,11 +150,7 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
             fontSize={fontSize}
             codeTheme={codeTheme}
             isDark={isDark}
-            onScroll={(e) => {
-              setScrollOffset(e.nativeEvent.contentOffset.y);
-              setContentHeight(e.nativeEvent.contentSize.height);
-              setScrollHeight(e.nativeEvent.layoutMeasurement.height);
-            }}
+            onScroll={handleScroll}
           />
         );
 
@@ -172,13 +169,7 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
 
       case 'text':
       default:
-        return (
-          <TextRenderer
-            content={currentFile.content}
-            theme={theme}
-            fontSize={fontSize}
-          />
-        );
+        return <TextRenderer content={currentFile.content} theme={theme} fontSize={fontSize} />;
     }
   };
 
@@ -186,13 +177,13 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* 头部 */}
       <View style={[styles.header, { backgroundColor: theme.headerBackground, borderBottomColor: theme.separator }]}>
-        {/* 返回按钮（非嵌入式模式才显示） */}
-        {!isEmbedded && onBack ? (
+        {/* 返回按钮：内嵌在文件浏览器右栏时也要能回到目录内容 */}
+        {onBack ? (
           <TouchableOpacity
             style={styles.headerButton}
             onPress={onBack}
             accessibilityRole="button"
-            accessibilityLabel="返回"
+            accessibilityLabel="返回目录"
           >
             <Ionicons name="chevron-back" size={26} color={theme.primary} />
           </TouchableOpacity>
@@ -207,7 +198,6 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
 
         {/* 右侧按钮组 */}
         <View style={styles.headerRight}>
-          {/* 分享 */}
           <TouchableOpacity
             style={styles.headerButton}
             onPress={handleShare}
@@ -217,7 +207,6 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
             <Ionicons name="share-outline" size={22} color={theme.primary} />
           </TouchableOpacity>
 
-          {/* 书签 */}
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => fileId && toggleBookmark(fileId)}
@@ -231,7 +220,6 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
             />
           </TouchableOpacity>
 
-          {/* 设置 */}
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => setShowSettings(true)}
@@ -244,22 +232,16 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
       </View>
 
       {/* 进度条 */}
-      {progress > 0 && progress < 100 && (
+      {progress > 0 && progress < 100 ? (
         <View style={[styles.progressBar, { backgroundColor: theme.separator }]}>
-          <View
-            style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.primary }]}
-          />
+          <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.primary }]} />
         </View>
-      )}
+      ) : null}
 
       {/* 面包屑导航 */}
       {currentFile?.directory ? (
         <View style={[styles.breadcrumbBar, { backgroundColor: theme.headerBackground, borderBottomColor: theme.separator }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.breadcrumbContent}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbContent}>
             <TouchableOpacity
               style={styles.breadcrumbItem}
               onPress={onBack}
@@ -269,10 +251,13 @@ export const ReaderContent: React.FC<ReaderContentProps> = ({ fileId, onBack, is
               <Ionicons name="home-outline" size={13} color={theme.textSecondary} />
             </TouchableOpacity>
             {currentFile.directory.split('/').map((segment, idx, arr) => (
-              <React.Fragment key={idx}>
+              <React.Fragment key={`${segment}-${idx}`}>
                 <Ionicons name="chevron-forward" size={12} color={theme.textTertiary} />
                 <Text
-                  style={[styles.breadcrumbText, { color: idx === arr.length - 1 ? theme.textSecondary : theme.textTertiary }]}
+                  style={[
+                    styles.breadcrumbText,
+                    { color: idx === arr.length - 1 ? theme.textSecondary : theme.textTertiary },
+                  ]}
                   numberOfLines={1}
                 >
                   {segment}
@@ -368,5 +353,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

@@ -6,7 +6,13 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types scripts/test-markdown-preprocess.mjs && node --experimental-strip-types scripts/test-math-render.mjs && node --experimental-strip-types scripts/test-file-tree.mjs",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "verify": "npm run typecheck && npm run test && npm run lint"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.1",
@@ -17,10 +23,9 @@
     "expo": "~51.0.28",
     "expo-document-picker": "~12.0.2",
     "expo-file-system": "~17.0.1",
-    "expo-sharing": "~12.0.1",
     "expo-status-bar": "~1.12.1",
     "highlight.js": "^11.9.0",
-    "prop-types": "^15.8.1",
+    "mathjax-full": "^3.2.2",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.5",
@@ -36,6 +41,9 @@
     "@babel/core": "^7.20.0",
     "@types/react": "~18.2.45",
     "eas-cli": "^21.0.2",
+    "eslint": "^8.57.0",
+    "eslint-config-expo": "^7.1.2",
+    "prettier": "^3.3.3",
     "typescript": "~5.3.3"
   },
   "private": true

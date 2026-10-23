@@ -18,7 +18,7 @@ interface CodeBlockProps {
 }
 
 // Web 平台专用渲染：react-native-webview 不支持 web，直接用 highlight.js 生成高亮 HTML
-const WebCodeBlock: React.FC<CodeBlockProps> = ({ code, language, codeTheme, isDark, wordWrap = false }) => {
+function WebCodeBlock({ code, language, codeTheme, isDark, wordWrap = false }: CodeBlockProps) {
   const highlightedCode = useMemo(
     () => highlightCode(code, language),
     [code, language]
@@ -26,7 +26,8 @@ const WebCodeBlock: React.FC<CodeBlockProps> = ({ code, language, codeTheme, isD
 
   const bgColor = getHighlightBgColor(codeTheme, isDark);
   const textColor = isDark ? '#D4D4D4' : '#24292E';
-  const themeCss = getHighlightThemeCss(codeTheme);
+  // 主题 CSS 必须跟着 isDark 走，否则深色模式会出现"深底 + 深色 token"
+  const themeCss = getHighlightThemeCss(codeTheme, isDark);
 
   const preStyle = wordWrap
     ? 'overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;'
@@ -74,15 +75,21 @@ const HEIGHT_DETECTION_SCRIPT = `
 `;
 
 const MIN_HEIGHT = 200;
+const isWeb = Platform.OS === 'web';
 
-export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language, codeTheme, isDark, wordWrap = false }) => {
-  // Web 平台使用原生 HTML 渲染，避免 react-native-webview 不支持 web 导致空白
-  if (Platform.OS === 'web') {
-    return <WebCodeBlock code={code} language={language} codeTheme={codeTheme} isDark={isDark} wordWrap={wordWrap} />;
-  }
-
+/**
+ * 原生平台：WebView 渲染（预高亮 HTML，高度由页面 postMessage 回来）。
+ * 注意 hooks 只能在组件内部无条件调用，所以平台判断放在模块级，
+ * 而不是在组件函数里 `if (Platform.OS === 'web') return ...` 之后再调 useState。
+ */
+const NativeCodeBlockImpl: React.FC<CodeBlockProps> = ({
+  code,
+  language,
+  codeTheme,
+  isDark,
+  wordWrap = false,
+}) => {
   const [webViewHeight, setWebViewHeight] = useState(0);
-  const [loaded, setLoaded] = useState(false);
 
   const html = useMemo(
     () => generateCodeHtml(code, language, codeTheme, isDark, wordWrap),
@@ -100,10 +107,6 @@ export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language,
     }
   }, []);
 
-  const handleLoadEnd = useCallback(() => {
-    setLoaded(true);
-  }, []);
-
   // 计算最终高度：有内容高度用内容高度，否则用最小高度
   const finalHeight = webViewHeight > 0 ? webViewHeight : MIN_HEIGHT;
 
@@ -113,34 +116,37 @@ export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language,
         source={{ html }}
         style={[styles.webview, { height: finalHeight }]}
         scrollEnabled={false}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
+        javaScriptEnabled
+        domStorageEnabled
+        cacheEnabled
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         originWhitelist={['*']}
         injectedJavaScript={HEIGHT_DETECTION_SCRIPT}
         onMessage={handleMessage}
-        onLoadEnd={handleLoadEnd}
       />
     </View>
   );
-}, (prev, next) => {
-  return prev.code === next.code && prev.language === next.language && prev.codeTheme === next.codeTheme && prev.isDark === next.isDark && prev.wordWrap === next.wordWrap;
-});
+};
 
-CodeBlock.displayName = 'CodeBlock';
+const NativeCodeBlock: React.FC<CodeBlockProps> = React.memo(
+  NativeCodeBlockImpl,
+  (prev, next) =>
+    prev.code === next.code &&
+    prev.language === next.language &&
+    prev.codeTheme === next.codeTheme &&
+    prev.isDark === next.isDark &&
+    prev.wordWrap === next.wordWrap
+);
+
+/** Web 平台没有 react-native-webview，直接用原生 HTML 渲染 */
+export const CodeBlock: React.FC<CodeBlockProps> = isWeb ? WebCodeBlock : NativeCodeBlock;
 
 const styles = StyleSheet.create({
   container: {
     borderRadius: 8,
     overflow: 'hidden',
     marginVertical: 8,
-  },
-  webContainer: {
-    borderRadius: 8,
-    minHeight: 100,
-    // web 平台让内部 HTML 内容自然撑开高度
-    alignSelf: 'stretch',
   },
   webview: {
     backgroundColor: 'transparent',

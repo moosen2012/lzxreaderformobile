@@ -38,3 +38,13 @@ ios/
 
 # Typescript
 *.tsbuildinfo
+
+# Lint / format
+.eslintcache
+
+# 临时调试文件
+.tmp-*
+*.log
+
+# 本地工作记忆
+.workbuddy/

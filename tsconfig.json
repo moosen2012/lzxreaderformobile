@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // 动态 import() 需要 esnext（默认 module 是 commonjs，会报 TS1323）。
+    // metro 自己负责转译，这里只影响类型检查。
+    "module": "esnext",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
