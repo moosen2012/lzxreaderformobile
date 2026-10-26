@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LZX Reader · 移动端文件管理器线框图</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --line:#e3e4e8; --line-strong:#cfd1d6;
+    --text:#1c1c1e; --sub:#666a72; --ter:#9a9da4;
+    --blue:#007aff; --blue-bg:#e3f0ff;
+    --amber:#f5a623; --amber-bg:#fff4e0;
+    --red:#ff3b30; --green:#34c759;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:32px 28px 64px; background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  .wrap{max-width:1320px;margin:0 auto}
+  h1{font-size:22px;font-weight:650;margin:0 0 6px}
+  h2{font-size:16px;font-weight:650;margin:44px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;font-weight:600;margin:0 0 4px}
+  p.lead{margin:0 0 4px;color:var(--sub);font-size:13px}
+  .meta{font-size:12px;color:var(--ter);margin:0 0 8px}
+  code{font-family:var(--mono);font-size:12px;background:#eef0f3;padding:1px 5px;border-radius:4px}
+
+  /* ---------- svg icons ---------- */
+  .ic{width:13px;height:13px;flex:0 0 auto;display:block}
+  .ic.sm{width:11px;height:11px}
+  .ic.lg{width:16px;height:16px}
+
+  /* ---------- device frames ---------- */
+  .grid{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;margin-top:18px}
+  .unit{width:340px}
+  .unit.wide{width:580px}
+  .device{
+    background:#fff;border:1px solid var(--line-strong);border-radius:20px;overflow:hidden;
+    box-shadow:0 10px 26px rgba(20,20,30,.07);position:relative;
+  }
+  .device.tablet{border-radius:16px}
+  .statusbar{height:20px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 12px;font-size:9px;color:#8a8a8e;background:#fff}
+  .statusbar .dot{display:inline-block;width:4px;height:4px;border-radius:50%;background:#c9cbd0;margin-left:3px}
+
+  /* ---------- app chrome ---------- */
+  .appbar{display:flex;align-items:center;gap:6px;height:34px;padding:0 8px;
+    border-bottom:1px solid var(--line);background:#fff}
+  .appbar.short{height:30px}
+  .appbar .title{flex:1;text-align:center;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .appbar .title.left{text-align:left;padding-left:2px}
+  .btn{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;flex:0 0 auto}
+  .btn.act{background:var(--blue-bg)}
+  .pathbar{display:flex;align-items:center;gap:3px;height:24px;padding:0 10px;background:#fff;
+    border-bottom:1px solid var(--line);font-size:9.5px;color:var(--sub);white-space:nowrap;overflow:hidden}
+  .pathbar b{color:var(--text);font-weight:600}
+  .pathbar .sep{color:var(--ter)}
+  .body{background:#f2f2f7;padding:0}
+
+  /* ---------- rows ---------- */
+  .row{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#fff;
+    border-bottom:1px solid #f0f0f3;font-size:10.5px}
+  .row .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .nm.dir{font-weight:600}
+  .row .mt{font-size:9px;color:var(--ter);white-space:nowrap}
+  .row .dots{width:16px;text-align:center;color:var(--ter);font-size:11px;letter-spacing:1px}
+  .row.active{background:var(--blue-bg)}
+  .row.active .nm{color:var(--blue);font-weight:600}
+  .row.sel{background:var(--blue-bg)}
+  .check{width:13px;height:13px;border:1px solid var(--line-strong);border-radius:4px;flex:0 0 auto}
+  .check.on{background:var(--blue);border-color:var(--blue);position:relative}
+  .check.on::after{content:"";position:absolute;left:3px;top:1px;width:5px;height:8px;
+    border:1.5px solid #fff;border-top:0;border-left:0;transform:rotate(40deg)}
+
+  /* ---------- sidebar / panes ---------- */
+  .split{display:flex;min-height:0}
+  .pane{background:#fff;overflow:hidden}
+  .pane.side{border-right:1px solid var(--line);flex:0 0 108px}
+  .pane.list{flex:1;min-width:0}
+  .pane.read{flex:1;min-width:0;border-left:1px solid var(--line);padding:8px 12px}
+  .panehead{display:flex;align-items:center;justify-content:space-between;
+    height:24px;padding:0 8px;border-bottom:1px solid var(--line);font-size:9.5px;color:var(--sub)}
+  .panehead b{color:var(--text);font-size:10px;font-weight:600}
+  .trow{display:flex;align-items:center;gap:4px;height:23px;font-size:9.5px;color:var(--text);
+    padding-right:6px;white-space:nowrap;overflow:hidden}
+  .trow .nm{overflow:hidden;text-overflow:ellipsis}
+  .trow.on{background:var(--blue-bg)}
+  .trow.on .nm{color:var(--blue);font-weight:600}
+  .tw{width:12px;text-align:center;color:var(--ter);font-size:8px;flex:0 0 auto}
+  .indent1{padding-left:10px}.indent2{padding-left:22px}.indent3{padding-left:34px}
+
+  .fakebody{font-size:9.5px;color:#4a4d55;line-height:1.75}
+  .fakebody h4{font-size:12px;margin:2px 0 6px;color:var(--text)}
+  .ln{height:5px;background:#e9ebef;border-radius:3px;margin:5px 0}
+  .ln.w60{width:60%}.ln.w80{width:80%}.ln.w40{width:40%}.ln.w90{width:90%}
+  .progress{height:3px;background:#eceef2;border-radius:2px;margin:8px 0 3px}
+  .progress i{display:block;height:3px;background:var(--blue);border-radius:2px}
+
+  .statusline{height:20px;display:flex;align-items:center;padding:0 10px;
+    border-top:1px solid var(--line);background:#fff;font-size:9px;color:var(--ter)}
+
+  /* ---------- drawer / overlay ---------- */
+  .overlay{position:absolute;inset:20px 0 0 0;display:flex}
+  .drawer{width:82%;background:#fff;border-right:1px solid var(--line);box-shadow:2px 0 12px rgba(0,0,0,.10)}
+  .mask{flex:1;background:rgba(0,0,0,.34)}
+  .center-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:82%;background:#fff;border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 12px 30px rgba(0,0,0,.16);overflow:hidden}
+
+  /* ---------- annotations ---------- */
+  .cap{margin-top:10px;font-size:11.5px;color:var(--sub)}
+  .cap b{color:var(--text);font-weight:600}
+  .notes{margin:8px 0 0;padding-left:16px;font-size:11.5px;color:var(--sub);line-height:1.75}
+  .notes li{margin:2px 0}
+  .notes em{font-style:normal;color:var(--text);font-weight:600}
+  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:999px;
+    background:var(--blue-bg);color:var(--blue);font-weight:600;vertical-align:1px}
+  .tag.warn{background:var(--amber-bg);color:#a86a00}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;
+    border-radius:50%;background:#1c1c1e;color:#fff;font-size:9px;font-weight:700;line-height:1}
+
+  /* ---------- matrix table ---------- */
+  table{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff;
+    border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#fafbfc;font-weight:600;font-size:12px;color:var(--sub)}
+  tr:last-child td{border-bottom:0}
+  td code{font-size:11.5px}
+
+  /* ---------- sheet ---------- */
+  .sheet{background:#fff;border-radius:12px 12px 0 0;border-top:1px solid var(--line);overflow:hidden}
+  .sheet .shead{padding:8px 12px;border-bottom:1px solid var(--line)}
+  .sheet .shead b{font-size:11px}
+  .sheet .shead span{display:block;font-size:9px;color:var(--ter)}
+  .sitem{display:flex;align-items:center;gap:7px;height:28px;padding:0 12px;font-size:10.5px;
+    border-bottom:1px solid #f2f2f5}
+  .sitem.danger{color:var(--red)}
+  .spacer{flex:1}
+  .statrow{display:flex;justify-content:space-between;font-size:9.5px;color:var(--sub);padding:2.5px 0}
+  .statrow b{color:var(--text);font-weight:600}
+  .cancel{display:block;text-align:center;font-size:10.5px;color:var(--blue);
+    padding:7px 0;border-top:1px solid var(--line);background:#fff}
+
+  .foot{margin-top:48px;padding-top:14px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--ter)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>LZX Reader · 移动端文件管理器线框图</h1>
+  <p class="lead">配套文档：<code>prd-docs/file-manager-redesign.md</code>　·　内容取自真实目录 <code>lzxwebnovel</code>（720 个 md / 1268 个目录 / 最深 13 层）</p>
+  <p class="meta">灰阶线框，非最终视觉；重点看结构、层级与断点差异。所有行高按 44pt 触控最小热区折算显示。</p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-folder" viewBox="0 0 16 16">
+        <path d="M1.5 4.2c0-.6.5-1.1 1.1-1.1h3.1l1.3 1.5h6.4c.6 0 1.1.5 1.1 1.1v6.6c0 .6-.5 1.1-1.1 1.1H2.6c-.6 0-1.1-.5-1.1-1.1V4.2z"
+              fill="#f5a623" opacity=".92"/>
+      </symbol>
+      <symbol id="i-folder-open" viewBox="0 0 16 16">
+        <path d="M1.5 4.2c0-.6.5-1.1 1.1-1.1h3.1l1.3 1.5h6.4c.6 0 1.1.5 1.1 1.1v1.1H1.5V4.2z" fill="#f0a020"/>
+        <path d="M1.5 6.3h13l-2.6 6.5c-.2.5-.7.8-1.2.8H2.6c-.6 0-1.1-.5-1.1-1.1V6.3z" fill="#ffc861"/>
+      </symbol>
+      <symbol id="i-file" viewBox="0 0 16 16">
+        <path d="M4 1.6h5.2L13 5.4v9c0 .6-.5 1-1 1H4c-.6 0-1-.4-1-1v-12c0-.6.4-.8 1-.8z" fill="#fff" stroke="#b9bcc4"/>
+        <path d="M9.2 1.6L13 5.4H9.2z" fill="#e6e8ec" stroke="#b9bcc4"/>
+      </symbol>
+      <symbol id="i-md" viewBox="0 0 16 16">
+        <path d="M4 1.6h5.2L13 5.4v9c0 .6-.5 1-1 1H4c-.6 0-1-.4-1-1v-12c0-.6.4-.8 1-.8z" fill="#fff" stroke="#6c56f0"/>
+        <path d="M9.2 1.6L13 5.4H9.2z" fill="#e9e4ff" stroke="#6c56f0"/>
+        <text x="3.4" y="13" font-size="5.6" fill="#6c56f0" font-family="monospace" font-weight="700">md</text>
+      </symbol>
+      <symbol id="i-chev" viewBox="0 0 16 16">
+        <path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="#b9bcc4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-chevd" viewBox="0 0 16 16">
+        <path d="M3.5 6L8 10.5 12.5 6" fill="none" stroke="#b9bcc4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 16 16">
+        <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="#1c1c1e" stroke-width="1.5" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-back" viewBox="0 0 16 16">
+        <path d="M10 3.5L5.5 8 10 12.5" fill="none" stroke="#007aff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 16 16">
+        <path d="M4 4l8 8M12 4l-8 8" stroke="#1c1c1e" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 16 16">
+        <circle cx="7" cy="7" r="4.2" fill="none" stroke="#666a72" stroke-width="1.4"/>
+        <path d="M10.2 10.2L13.5 13.5" stroke="#666a72" stroke-width="1.4" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-gear" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="2.5" fill="none" stroke="#666a72" stroke-width="1.3"/>
+        <path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1"
+              stroke="#666a72" stroke-width="1.3" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 16 16">
+        <path d="M3 4.5h10M6.2 4.5V3h3.6v1.5M4.3 4.5l.6 8.6c0 .5.4.9.9.9h4.4c.5 0 .9-.4.9-.9l.6-8.6"
+              fill="none" stroke="#ff3b30" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-bookmark" viewBox="0 0 16 16">
+        <path d="M4.5 2.2h7c.4 0 .7.3.7.7v10.4l-4.2-3-4.2 3V2.9c0-.4.3-.7.7-.7z"
+              fill="none" stroke="#666a72" stroke-width="1.3" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <h2 id="s1">1. 断点与布局档位</h2>
+  <p class="lead">从「宽/窄两档」升级为四档，再叠加方向修正。宽度决定结构，高度决定密度。</p>
+
+  <table>
+    <tr><th style="width:110px">档位</th><th style="width:190px">条件</th><th style="width:230px">布局</th><th>典型设备 / 说明</th></tr>
+    <tr><td><b>C</b> Compact</td><td><code>width &lt; 600</code></td><td>单栏 + 抽屉树（84% 宽）</td><td>手机竖屏、安卓分屏、折叠屏折叠态</td></tr>
+    <tr><td><b>M</b> Medium</td><td><code>600 ≤ width &lt; 900</code></td><td>双栏：树 240 + 列表</td><td>平板竖屏、手机横屏；短屏时树默认收起</td></tr>
+    <tr><td><b>E</b> Expanded</td><td><code>900 ≤ width &lt; 1200</code></td><td>双栏：树 280 + 列表</td><td>小平板横屏、折叠屏展开态</td></tr>
+    <tr><td><b>L</b> Large</td><td><code>width ≥ 1200</code></td><td><b>三栏</b>：树 260 + 列表 320 + 阅读</td><td>大平板横屏，最接近桌面资源管理器</td></tr>
+  </table>
+
+  <h3 style="margin-top:16px">方向修正规则</h3>
+  <table>
+    <tr><th style="width:150px">规则</th><th style="width:190px">触发条件</th><th>效果</th></tr>
+    <tr><td>短屏压缩</td><td><code>height &lt; 480</code></td><td>顶栏 52 → 44；侧栏默认收起；行高保持 44（不再压）</td></tr>
+    <tr><td>横屏沉浸阅读</td><td><code>isLandscape &amp;&amp; 阅读中</code></td><td>隐藏顶栏，仅保留浮动返回 + 进度条</td></tr>
+    <tr><td>正文限宽</td><td>阅读区 <code>width ≥ 700</code></td><td>正文 <code>max-width:780</code> 居中，行长 60–75 字符</td></tr>
+    <tr><td>断点防抖</td><td>宽度变化 &lt; 24pt</td><td>不切换档位，避免折叠屏/分屏抖动引发布局闪烁</td></tr>
+  </table>
+
+  <h2 id="s2">2. 手机竖屏 · C 档</h2>
+  <p class="lead">单栏 + 抽屉。返回键要逐级退，这是 C 档最容易踩的坑。</p>
+
+  <div class="grid">
+    <!-- ============ 2.1 列表 ============ -->
+    <div class="unit">
+      <h3>2.1 目录列表（当前目录 docs / 02-架构）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar">
+          <div class="btn"><svg class="ic lg"><use href="#i-menu"/></svg></div>
+          <div class="title">lzxwebnovel</div>
+          <div class="btn"><svg class="ic"><use href="#i-search"/></svg></div>
+          <div class="btn"><span style="font-size:13px;color:#1c1c1e">···</span></div>
+        </div>
+        <div class="pathbar">
+          <span>全部</span><span class="sep">›</span>
+          <span>docs</span><span class="sep">›</span>
+          <b>02-架构</b>
+        </div>
+        <div class="body" style="padding-bottom:2px">
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">01-需求</span><span class="mt">12 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">02-架构</span><span class="mt">8 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">03-设计</span><span class="mt">5 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+          <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">README.md</span><span class="mt">4.2 KB</span><span class="dots">···</span></div>
+          <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">overview.md</span><span class="mt">12 KB</span><span class="dots">···</span></div>
+          <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">notes.md</span><span class="mt">1.0 KB</span><span class="dots">···</span></div>
+          <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">glossary.md</span><span class="mt">3.4 KB</span><span class="dots">···</span></div>
+          <div class="row"><svg class="ic"><use href="#i-file"/></svg><span class="nm">diagram.png</span><span class="mt">—</span><span class="dots">···</span></div>
+          <div style="height:96px;background:#f2f2f7"></div>
+        </div>
+        <div class="statusline"><span>3 个文件夹 · 5 个文件</span></div>
+      </div>
+      <ul class="notes">
+        <li><em>①</em> 顶栏只有一个核心动作入口 <code>···</code>，导入/主题/设置都收进去，避免挤占标题</li>
+        <li><em>②</em> 路径栏可横向滑动，末段加粗；层级过深时中间段折叠为 <code>…</code></li>
+        <li><em>③</em> 每行右侧常驻 <code>···</code>：触屏没有 hover，操作不能藏在长按里</li>
+        <li><em>④</em> 目录行显示「子项数」，文件行显示大小 + 时间</li>
+      </ul>
+    </div>
+
+    <!-- ============ 2.2 抽屉 ============ -->
+    <div class="unit">
+      <h3>2.2 抽屉打开（点 ☰）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar">
+          <div class="btn act"><svg class="ic lg"><use href="#i-menu"/></svg></div>
+          <div class="title">lzxwebnovel</div>
+          <div class="btn"><svg class="ic"><use href="#i-search"/></svg></div>
+          <div class="btn"><span style="font-size:13px">···</span></div>
+        </div>
+        <div style="position:relative;height:290px;background:#f2f2f7">
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">01-需求</span><span class="mt">12 项</span></div>
+          <div style="position:absolute;inset:0;display:flex">
+            <div class="drawer">
+              <div class="panehead"><span><b>目录</b> &nbsp;720</span><span style="color:#9a9da4">✕</span></div>
+              <div class="trow on"><span class="tw">▾</span><svg class="ic sm"><use href="#i-folder-open"/></svg><span class="nm">docs</span></div>
+              <div class="trow indent1"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">01-需求</span></div>
+              <div class="trow indent1 on"><span class="tw">▾</span><svg class="ic sm"><use href="#i-folder-open"/></svg><span class="nm">02-架构</span></div>
+              <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">api</span></div>
+              <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">data</span></div>
+              <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">imgs</span></div>
+              <div class="trow indent1"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">03-设计</span></div>
+              <div class="trow"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">web</span></div>
+              <div class="trow"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">我的文件</span></div>
+            </div>
+            <div class="mask"></div>
+          </div>
+        </div>
+        <div class="statusline"><span>点目录 → 导航并自动收抽屉；点箭头 → 只展开</span></div>
+      </div>
+      <ul class="notes">
+        <li><em>⑤</em> 树里<b>只放目录</b>，文件留给右侧列表 —— 5000 节点时行数减少约 90%</li>
+        <li><em>⑥</em> 箭头与行是两个独立热区（现有实现已做对，保留）</li>
+        <li><em>⑦</em> 遮罩点击关闭；返回键第一优先级也是关抽屉</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s3">3. 手机横屏 · M 档 + 短屏修正</h2>
+  <p class="lead">宽度够了但高度只有 ~390pt。若沿用现在的 280pt 常驻侧栏，正文只剩 338pt 高。</p>
+
+  <div class="grid">
+    <div class="unit wide">
+      <h3>3.1 列表（侧栏默认收起）</h3>
+      <div class="device">
+        <div class="statusbar" style="height:16px"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar short">
+          <div class="btn"><svg class="ic"><use href="#i-menu"/></svg></div>
+          <div class="title left">docs › 02-架构</div>
+          <div class="btn"><svg class="ic"><use href="#i-search"/></svg></div>
+          <div class="btn"><span style="font-size:12px">···</span></div>
+        </div>
+        <div class="body" style="display:flex">
+          <div class="pane list">
+            <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">api</span><span class="mt">3 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+            <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">data</span><span class="mt">7 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+            <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">README.md</span><span class="mt">4.2 KB</span><span class="dots">···</span></div>
+            <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">design.md</span><span class="mt">8.1 KB</span><span class="dots">···</span></div>
+            <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">notes.md</span><span class="mt">1.0 KB</span><span class="dots">···</span></div>
+          </div>
+        </div>
+        <div class="statusline"><span>2 个文件夹 · 3 个文件</span></div>
+      </div>
+      <ul class="notes">
+        <li><em>①</em> 顶栏 52 → <b>44</b>，把高度还给内容</li>
+        <li><em>②</em> 侧栏默认收起，靠 <code>☰</code> 唤出覆盖式抽屉（不是常驻 280pt）</li>
+        <li><em>③</em> 路径直接在标题位显示，省掉独立路径栏一整行</li>
+      </ul>
+    </div>
+
+    <div class="unit wide">
+      <h3>3.2 沉浸阅读（顶栏隐藏，只留浮动返回 + 进度）</h3>
+      <div class="device">
+        <div class="statusbar" style="height:16px"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar short" style="background:#fff;border-bottom:1px solid #e3e4e8">
+          <div class="btn"><svg class="ic"><use href="#i-back"/></svg></div>
+          <div class="title left" style="font-size:10.5px">02-架构 / README.md</div>
+          <div class="btn"><svg class="ic"><use href="#i-bookmark"/></svg></div>
+          <div class="btn"><svg class="ic"><use href="#i-gear"/></svg></div>
+        </div>
+        <div class="pane read" style="background:#fff;padding:10px 44px">
+          <div class="fakebody">
+            <h4># 架构设计</h4>
+            <div class="ln w90"></div><div class="ln w80"></div><div class="ln w60"></div>
+            <div class="ln w90" style="margin-top:10px"></div><div class="ln w80"></div>
+          </div>
+        </div>
+        <div style="background:#fff;padding:4px 12px 8px">
+          <div class="progress"><i style="width:62%"></i></div>
+          <div style="font-size:8.5px;color:#9a9da4">62%</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li><em>④</em> 横屏阅读时不再叠两条头（AppHeader + 阅读器头），只留一条</li>
+        <li><em>⑤</em> 正文两侧留 44pt 内边距，避免长行贴边</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s4">4. 平板竖屏 · M 档（双栏）</h2>
+
+  <div class="grid">
+    <div class="unit wide">
+      <div class="device tablet">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar">
+          <div class="btn"><svg class="ic lg"><use href="#i-menu"/></svg></div>
+          <div class="title left" style="font-size:12px">lzxwebnovel</div>
+          <div class="btn"><svg class="ic"><use href="#i-search"/></svg></div>
+          <div class="btn"><svg class="ic"><use href="#i-gear"/></svg></div>
+          <div class="btn"><span style="font-size:13px">···</span></div>
+        </div>
+        <div class="body" style="display:flex;height:262px">
+          <div class="pane side" style="flex:0 0 168px">
+            <div class="panehead"><span><b>目录</b>&nbsp; 720</span><span>‹</span></div>
+            <div class="trow"><span class="tw">▾</span><svg class="ic sm"><use href="#i-folder-open"/></svg><span class="nm">docs</span></div>
+            <div class="trow indent1"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">01-需求</span></div>
+            <div class="trow indent1 on"><span class="tw">▾</span><svg class="ic sm"><use href="#i-folder-open"/></svg><span class="nm">02-架构</span></div>
+            <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">api</span></div>
+            <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">data</span></div>
+            <div class="trow indent1"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">03-设计</span></div>
+            <div class="trow"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">web</span></div>
+            <div class="trow"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">我的文件</span></div>
+            <div style="position:absolute;display:none"></div>
+          </div>
+          <div class="pane list">
+            <div class="pathbar" style="border-bottom:1px solid #e3e4e8;height:22px">
+              <span>全部</span><span class="sep">›</span><span>docs</span><span class="sep">›</span><b>02-架构</b>
+            </div>
+            <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">api</span><span class="mt">3 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+            <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">data</span><span class="mt">7 项</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+            <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">README.md</span><span class="mt">4.2 KB</span><span class="dots">···</span></div>
+            <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">design.md</span><span class="mt">8.1 KB</span><span class="dots">···</span></div>
+            <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">notes.md</span><span class="mt">1.0 KB</span><span class="dots">···</span></div>
+            <div class="row"><svg class="ic"><use href="#i-file"/></svg><span class="nm">schema.json</span><span class="mt">6 KB</span><span class="dots">···</span></div>
+          </div>
+        </div>
+        <div class="statusline"><span>左侧 240（可拖 200–320）　·　右侧自适应</span></div>
+      </div>
+      <ul class="notes">
+        <li><em>①</em> 竖屏平板两栏足够；侧栏宽度可拖拽调整（P2）</li>
+        <li><em>②</em> 阅读时右栏替换为阅读器，「返回」回到当前目录，树里的高亮保持</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s5">5. 平板横屏 · L 档（三栏）</h2>
+  <p class="lead">这是唯一不浪费横屏宽度的排法：树负责定位、列表负责选择、右栏负责阅读。</p>
+
+  <div class="grid">
+    <div class="unit wide">
+      <div class="device tablet">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar">
+          <div class="btn"><svg class="ic lg"><use href="#i-menu"/></svg></div>
+          <div class="title left" style="font-size:12px">lzxwebnovel</div>
+          <div class="btn"><svg class="ic"><use href="#i-search"/></svg></div>
+          <div class="btn"><svg class="ic"><use href="#i-gear"/></svg></div>
+          <div class="btn"><span style="font-size:13px">···</span></div>
+        </div>
+        <div class="body" style="display:flex;height:250px">
+          <div class="pane side" style="flex:0 0 118px">
+            <div class="panehead"><span><b>目录</b></span></div>
+            <div class="trow"><span class="tw">▾</span><svg class="ic sm"><use href="#i-folder-open"/></svg><span class="nm">docs</span></div>
+            <div class="trow indent1"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">01-需求</span></div>
+            <div class="trow indent1 on"><span class="tw">▾</span><svg class="ic sm"><use href="#i-folder-open"/></svg><span class="nm">02-架构</span></div>
+            <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">api</span></div>
+            <div class="trow indent2"><span class="tw"></span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">data</span></div>
+            <div class="trow indent1"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">03-设计</span></div>
+            <div class="trow"><span class="tw">▸</span><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm">web</span></div>
+          </div>
+          <div class="pane list" style="flex:0 0 150px">
+            <div class="pathbar" style="height:22px;border-bottom:1px solid #e3e4e8;font-size:8.5px">
+              <span>…</span><span class="sep">›</span><b>02-架构</b>
+            </div>
+            <div class="row" style="font-size:9px"><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm dir">api</span><span class="mt">3</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+            <div class="row" style="font-size:9px"><svg class="ic sm"><use href="#i-folder"/></svg><span class="nm dir">data</span><span class="mt">7</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+            <div class="row active" style="font-size:9px"><svg class="ic sm"><use href="#i-md"/></svg><span class="nm">README.md</span><span class="dots">···</span></div>
+            <div class="row" style="font-size:9px"><svg class="ic sm"><use href="#i-md"/></svg><span class="nm">design.md</span><span class="dots">···</span></div>
+            <div class="row" style="font-size:9px"><svg class="ic sm"><use href="#i-md"/></svg><span class="nm">notes.md</span><span class="dots">···</span></div>
+          </div>
+          <div class="pane read">
+            <div style="display:flex;align-items:center;gap:5px;font-size:9px;color:#666a72;border-bottom:1px solid #e3e4e8;padding-bottom:6px;margin-bottom:8px">
+              <b style="color:#1c1c1e;font-size:9.5px">README.md</b>
+              <div class="spacer"></div>
+              <span>‹ ›</span><span class="dots">···</span>
+            </div>
+            <div class="fakebody" style="max-width:250px">
+              <h4># 架构设计</h4>
+              <div class="ln w90"></div><div class="ln w80"></div><div class="ln w60"></div>
+              <div class="ln w90" style="margin-top:9px"></div><div class="ln w80"></div><div class="ln w40"></div>
+            </div>
+            <div style="position:absolute;display:none"></div>
+          </div>
+        </div>
+        <div class="statusline"><span>260　│　320　│　flex（正文 max-width 780 居中）</span></div>
+      </div>
+      <ul class="notes">
+        <li><em>①</em> 树只显示目录，列表显示当前目录内容，右栏显示选中文件</li>
+        <li><em>②</em> 点文件<b>不切走列表</b> —— 这是和现状「右栏替换」最大的差别，连续翻阅不用来回退回</li>
+        <li><em>③</em> 未选文件时右栏是占位（「从左侧选择一个文件」），不抢占列表宽度</li>
+        <li><em>④</em> 正文 <code>max-width:780</code>；平板横屏不加限制会长到 100+ 字符/行</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s6">6. 导入流程（扫描 → 确认 → 索引）</h2>
+  <p class="lead">现状是「边遍历边全量读内容」，所以无法提示规模、无法取消、且 200 个就静默截断。这里把目录结构与文件内容彻底拆开。</p>
+
+  <div class="grid">
+    <div class="unit">
+      <h3>6.1 扫描中（可取消）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div style="position:relative;height:300px;background:#f2f2f7">
+          <div class="row" style="opacity:.5"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">01-需求</span></div>
+          <div class="center-card" style="width:86%">
+            <div style="padding:14px 14px 12px;text-align:center">
+              <div style="font-size:11.5px;font-weight:600;margin-bottom:8px">正在扫描目录…</div>
+              <div class="progress" style="height:5px;margin:0 0 8px"><i style="width:42%;height:5px"></i></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:#9a9da4">
+                <span>42%</span><span>1,268 个文件夹 · 3,412 个文件</span>
+              </div>
+              <div style="margin-top:10px;font-size:9px;color:#9a9da4;text-align:left">
+                当前：<code style="font-size:8.5px">docs/02-架构/api</code>
+              </div>
+            </div>
+            <div class="cancel">取消</div>
+          </div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>只列目录取元数据，<b>不读内容</b>，所以很快</li>
+        <li>实时显示已发现的文件夹/文件数，用户知道卡在哪一层</li>
+        <li>取消后已扫描部分可选择保留</li>
+      </ul>
+    </div>
+
+    <div class="unit">
+      <h3>6.2 确认范围（超过 500 个文件才出现）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div style="position:relative;height:300px;background:#f2f2f7">
+          <div class="row" style="opacity:.5"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">01-需求</span></div>
+          <div class="center-card" style="width:86%">
+            <div style="padding:12px 14px">
+              <div style="font-size:11.5px;font-weight:600;margin-bottom:6px">已找到</div>
+              <div class="statrow"><span>文件</span><b>720 个</b></div>
+              <div class="statrow"><span>文件夹</span><b>1,268 个</b></div>
+              <div class="statrow"><span>最深层级</span><b>13 层</b></div>
+              <div class="statrow"><span>合计体积</span><b>48.2 MB</b></div>
+              <div class="statrow"><span>可阅读</span><b>1,052 个</b></div>
+            </div>
+            <div style="display:flex;border-top:1px solid #e3e4e8">
+              <div style="flex:1;text-align:center;padding:8px 0;font-size:10px;color:#666a72;border-right:1px solid #e3e4e8">仅 Markdown</div>
+              <div style="flex:1;text-align:center;padding:8px 0;font-size:10px;color:#007aff;font-weight:600">全部导入</div>
+            </div>
+            <div class="cancel">取消</div>
+          </div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>先给规模，再让用户决定 —— 避免"点完就卡死"</li>
+        <li>提供「仅 Markdown」这类低成本子集，几十秒就能先看起来</li>
+      </ul>
+    </div>
+
+    <div class="unit">
+      <h3>6.3 索引进度（可后台）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar"><div class="btn"><svg class="ic"><use href="#i-menu"/></svg></div><div class="title">lzxwebnovel</div><div class="btn"><span style="font-size:13px">···</span></div></div>
+        <div style="background:#fff4e0;padding:5px 10px;display:flex;align-items:center;gap:6px;font-size:9px;color:#a86a00">
+          <span>正在导入 312 / 720</span><div class="spacer"></div><span>取消</span>
+        </div>
+        <div class="pathbar"><span>全部</span><span class="sep">›</span><b>lzxwebnovel</b></div>
+        <div class="body">
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">docs</span><span class="mt">712</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">web</span><span class="mt">…</span><svg class="ic sm"><use href="#i-chev"/></svg></div>
+          <div class="row" style="background:#fffaf0"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">internal</span><span class="mt">扫描中</span></div>
+          <div style="height:120px;background:#f2f2f7"></div>
+        </div>
+        <div class="statusline"><span>完成后顶部 Toast：已导入 1,052 个文件</span></div>
+      </div>
+      <ul class="notes">
+        <li>索引进度是"写入索引"，不是"读文件内容"，所以很快</li>
+        <li>可切后台；回来看到的是已完成部分 + 剩余继续</li>
+        <li>超限时黄条改为：<b>已达 20000 上限，仅导入前 20000 个</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s7">7. 交互状态：选择模式 / 操作单 / 异常</h2>
+
+  <div class="grid">
+    <div class="unit">
+      <h3>7.1 选择模式（长按进入）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar" style="background:#fff">
+          <div class="btn"><svg class="ic"><use href="#i-close"/></svg></div>
+          <div class="title left" style="font-weight:600">已选 3 项</div>
+          <span style="font-size:9.5px;color:#007aff;padding:0 4px">移动到</span>
+          <div class="btn"><svg class="ic"><use href="#i-trash"/></svg></div>
+        </div>
+        <div class="pathbar"><span>全部</span><span class="sep">›</span><span>docs</span><span class="sep">›</span><b>02-架构</b></div>
+        <div class="body">
+          <div class="row sel"><span class="check on"></span><svg class="ic"><use href="#i-md"/></svg><span class="nm">README.md</span></div>
+          <div class="row sel"><span class="check on"></span><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">02-架构</span></div>
+          <div class="row"><span class="check"></span><svg class="ic"><use href="#i-md"/></svg><span class="nm">notes.md</span></div>
+          <div class="row sel"><span class="check on"></span><svg class="ic"><use href="#i-md"/></svg><span class="nm">design.md</span></div>
+          <div style="height:110px;background:#f2f2f7"></div>
+        </div>
+        <div class="statusline"><span>返回键 = 退出选择模式（第一优先级）</span></div>
+      </div>
+      <ul class="notes">
+        <li>移动端没有框选/Ctrl 多选，选择模式是唯一可行方案</li>
+        <li>批量只保留「移动 / 删除」，批量重命名风险太高不做</li>
+      </ul>
+    </div>
+
+    <div class="unit">
+      <h3>7.2 操作单（行尾 ··· 或长按）</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="body" style="background:#f2f2f7;opacity:.45">
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">api</span><span class="mt">3 项</span></div>
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir">data</span><span class="mt">7 项</span></div>
+          <div class="row"><svg class="ic"><use href="#i-md"/></svg><span class="nm">README.md</span></div>
+          <div style="height:96px"></div>
+        </div>
+        <div class="sheet">
+          <div class="shead"><b>README.md</b><span>4.2 KB · 2026-10-23 14:02</span></div>
+          <div class="sitem">打开</div>
+          <div class="sitem">收藏</div>
+          <div class="sitem">重命名</div>
+          <div class="sitem">移动到…</div>
+          <div class="sitem danger">删除</div>
+          <div class="cancel">取消</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>用自绘底部 Sheet，不用 <code>ActionSheetIOS</code>：跨平台一致、危险项可分组</li>
+        <li>目录与文件共用同一个 Sheet，只是「打开」文案变成「进入」</li>
+      </ul>
+    </div>
+
+    <div class="unit">
+      <h3>7.3 异常态：授权失效 / 空目录</h3>
+      <div class="device">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="appbar"><div class="btn"><svg class="ic"><use href="#i-menu"/></svg></div><div class="title">lzxwebnovel</div><div class="btn"><span style="font-size:13px">···</span></div></div>
+        <div style="background:#fff4e0;padding:6px 10px;display:flex;align-items:center;gap:6px;font-size:9px;color:#a86a00;border-bottom:1px solid #f2e4c8">
+          <span>授权已失效，目录内容不可读</span><div class="spacer"></div><b>重新授权</b>
+        </div>
+        <div class="pathbar"><span>全部</span><span class="sep">›</span><b>lzxwebnovel</b></div>
+        <div class="body">
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir" style="color:#9a9da4">docs</span><span class="mt">⚠</span></div>
+          <div class="row"><svg class="ic"><use href="#i-folder"/></svg><span class="nm dir" style="color:#9a9da4">web</span><span class="mt">⚠</span></div>
+          <div style="padding:38px 20px;text-align:center;background:#f2f2f7">
+            <svg class="ic lg" style="margin:0 auto 6px"><use href="#i-folder"/></svg>
+            <div style="font-size:10.5px;font-weight:600;margin-bottom:2px">这个文件夹是空的</div>
+            <div style="font-size:9px;color:#9a9da4">下拉可重新扫描该目录</div>
+          </div>
+        </div>
+        <div class="statusline"><span>三种空态必须区分：空库 / 空目录 / 授权失效</span></div>
+      </div>
+      <ul class="notes">
+        <li>空目录现在能显示了（挂载点 + 节点索引模型），不再"受限于数据模型"</li>
+        <li>授权失效按挂载点整体标记，不逐行报错</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s8">8. 返回键层级（当前实现缺最后一级）</h2>
+  <table>
+    <tr><th style="width:60px">顺序</th><th style="width:180px">状态</th><th>行为</th><th style="width:260px">现状</th></tr>
+    <tr><td>1</td><td>选择模式</td><td>退出选择模式</td><td>未实现</td></tr>
+    <tr><td>2</td><td>C 档抽屉打开</td><td>关闭抽屉</td><td>已实现</td></tr>
+    <tr><td>3</td><td>右栏在阅读</td><td>回到目录列表（保留选中）</td><td>已实现</td></tr>
+    <tr><td>4</td><td>非根目录</td><td>返回上一级目录</td><td><b>缺失</b> → 直接退 App</td></tr>
+    <tr><td>5</td><td>根目录</td><td>交给系统退出</td><td>已实现</td></tr>
+  </table>
+
+  <div class="foot">
+    配套文档：<code>prd-docs/file-manager-redesign.md</code>（根因、数据模型、技术选型、分阶段计划、验收清单）<br>
+    本页只表达结构与交互，不含最终视觉规范。
+  </div>
+</div>
+</body>
+</html>

@@ -8,11 +8,12 @@ import type { FileItem, TreeNode } from '../types';
  * 由 utils/fileHelper 的 buildFileTree 按路径段拼出来。
  */
 
-/** 统一分隔符并去掉首尾斜杠，'/' 与 '\' 都接受 */
+/** 统一分隔符、折叠连续斜杠并去掉首尾斜杠，'/' 与 '\' 都接受 */
 export function normalizePath(path: string | undefined | null): string {
   if (!path) return '';
   return String(path)
     .replace(/\\/g, '/')
+    .replace(/\/{2,}/g, '/')
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
 }

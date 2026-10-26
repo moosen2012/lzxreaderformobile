@@ -1,4 +1,5 @@
-import { buildFileTree } from '../src/utils/fileHelper.ts';
+import { buildFileTree, stripFiles } from '../src/utils/fileHelper.ts';
+import { isStructuralChange } from '../src/utils/indexDiff.ts';
 import {
   countChildren,
   countFiles,
@@ -152,6 +153,141 @@ const cases = [
       isPathInside('docs', 'docs') === true &&
       isPathInside('docsx', 'docs') === false &&
       isPathInside('anything', '') === true,
+  },
+
+  // ===== 真机回归：Android SAF 目录导入产生的脏路径不能崩 =====
+  // 崩溃现场：dirNodeMap.get(dir) 返回 undefined 后读 .children
+  // （ErrorBoundary 捕获的 "Cannot read property 'children' of undefined"）
+  {
+    name: 'buildFileTree 容忍双斜杠目录（SAF 尾斜杠 rootName 的产物）',
+    expect: () => {
+      const t = buildFileTree([file('d1', 'a.md', 'test//sub')]);
+      const node = findNode(t, 'test/sub');
+      return !!node && node.isDirectory && node.children.length === 1;
+    },
+  },
+  {
+    name: 'buildFileTree 容忍前导斜杠目录',
+    expect: () => {
+      const t = buildFileTree([file('d2', 'b.md', '/test')]);
+      return t.length === 1 && t[0].path === 'test' && t[0].children.length === 1;
+    },
+  },
+  {
+    name: 'buildFileTree 容忍尾斜杠与反斜杠目录',
+    expect: () => {
+      const t = buildFileTree([
+        file('d3', 'c.md', 'test/'),
+        file('d4', 'd.md', 'test\\nested'),
+      ]);
+      const sub = findNode(t, 'test/nested');
+      const testNode = findNode(t, 'test');
+      return !!sub && !!testNode && testNode.children.length === 2;
+    },
+  },
+  {
+    name: 'buildFileTree 归一后同目录不重复建节点',
+    expect: () => {
+      const t = buildFileTree([
+        file('d5', 'e.md', 'test/sub'),
+        file('d6', 'f.md', 'test//sub'),
+        file('d7', 'g.md', '/test/sub/'),
+      ]);
+      const sub = findNode(t, 'test/sub');
+      return !!sub && sub.children.length === 3;
+    },
+  },
+  {
+    name: 'normalizePath 折叠连续斜杠并去首尾',
+    expect: () =>
+      normalizePath('a//b///c/') === 'a/b/c' &&
+      normalizePath('/a/b') === 'a/b' &&
+      normalizePath('a\\b') === 'a/b' &&
+      normalizePath('///') === '' &&
+      normalizePath(undefined) === '' &&
+      normalizePath(null) === '',
+  },
+
+  // ===== v3：显式目录（空目录也要出现在树里） =====
+  {
+    name: 'buildFileTree 收录没有任何文件的空目录',
+    expect: () => {
+      const t = buildFileTree([file('e1', 'a.md', 'docs')], [{ path: 'docs/empty' }]);
+      const empty = findNode(t, 'docs/empty');
+      const docs = findNode(t, 'docs');
+      return !!empty && empty.isDirectory && empty.children.length === 0 && docs?.children.length === 2;
+    },
+  },
+  {
+    name: 'buildFileTree 空目录缺失的祖先链会自动补齐',
+    expect: () => {
+      const t = buildFileTree([], [{ path: 'root/a/b/c' }]);
+      const leaf = findNode(t, 'root/a/b/c');
+      return !!leaf && leaf.isDirectory && t.length === 1 && t[0].path === 'root';
+    },
+  },
+  {
+    name: 'buildFileTree 显式目录与文件目录重复时不产生重复节点',
+    expect: () => {
+      const t = buildFileTree([file('e2', 'x.md', 'docs/api')], [
+        { path: 'docs' },
+        { path: 'docs/api' },
+      ]);
+      const docs = findNode(t, 'docs');
+      return !!docs && docs.children.length === 1 && docs.children[0].children.length === 1;
+    },
+  },
+  {
+    name: 'buildFileTree 显式目录里的脏路径同样被归一',
+    expect: () => {
+      const t = buildFileTree([], [{ path: '/docs//a/' }]);
+      const node = findNode(t, 'docs/a');
+      return !!node && node.isDirectory && t[0].path === 'docs';
+    },
+  },
+  {
+    name: 'buildFileTree 只有显式目录时根节点排序稳定（目录优先）',
+    expect: () => {
+      const t = buildFileTree([file('e3', 'z.md', '')], [{ path: 'b' }, { path: 'a' }]);
+      return t.length === 3 && t[0].name === 'a' && t[1].name === 'b' && t[2].name === 'z.md';
+    },
+  },
+  {
+    name: 'stripFiles 剔掉所有文件节点，只留目录骨架',
+    expect: () => {
+      const stripped = stripFiles(tree);
+      const walk = (nodes) => nodes.every((n) => n.isDirectory && n.fileId === undefined && walk(n.children));
+      // 根级 README.md 被剔除，docs 保留
+      return walk(stripped) && stripped.length === 1 && stripped[0].name === 'docs';
+    },
+  },
+  {
+    name: 'stripFiles 保留空目录（目录节点不依赖文件存在）',
+    expect: () => {
+      const stripped = stripFiles(buildFileTree([], [{ path: 'a/b/c' }]));
+      return stripped.length === 1 && stripped[0].children[0]?.children[0]?.path === 'a/b/c';
+    },
+  },
+  {
+    name: 'isStructuralChange 只有正文变化时不重写索引',
+    expect: () => {
+      const before = [file('f1', 'a.md', 'docs'), file('f2', 'b.md', 'docs')];
+      const after = [{ ...before[0], content: '# 正文' }, before[1]];
+      return isStructuralChange(before, before) === false && isStructuralChange(before, after) === false;
+    },
+  },
+  {
+    name: 'isStructuralChange 增删/改名/换目录/换 uri 都算结构变化',
+    expect: () => {
+      const before = [file('f1', 'a.md', 'docs')];
+      return (
+        isStructuralChange(before, []) === true &&
+        isStructuralChange(before, [{ ...before[0], name: 'b.md' }]) === true &&
+        isStructuralChange(before, [{ ...before[0], directory: 'other' }]) === true &&
+        isStructuralChange(before, [{ ...before[0], uri: 'content://x' }]) === true &&
+        isStructuralChange(before, [{ ...before[0], id: 'f2' }]) === true
+      );
+    },
   },
 ];
 

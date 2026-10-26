@@ -1,5 +1,6 @@
 import type { FileType } from '../types';
-import type { FileItem, TreeNode } from '../types';
+import type { DirectoryItem, FileItem, TreeNode } from '../types';
+import { normalizePath } from './fileTree.ts';
 
 // 文件扩展名到文件类型的映射
 const EXTENSION_MAP: Record<string, FileType> = {
@@ -203,26 +204,59 @@ export function isSupportedFile(fileName: string): boolean {
 }
 
 /**
- * 从 files 数组按 directory 字段构建目录树。
+ * 按 directory 字段 + 显式目录列表构建目录树。
  *
- * 有 directory 字段的文件按路径段构建嵌套树；
- * 无 directory 字段的文件作为根级文件节点。
+ * 两种目录来源都会消费：
+ * - `directories`：导入时扫描到的真实目录，**空目录也能出现在树里**（旧实现的最大缺口）；
+ * - `FileItem.directory`：兜底，兼容 v3 之前没有显式目录的老数据。
  *
- * @param files 文件数组
- * @returns     目录树根节点数组
+ * @param files       文件数组
+ * @param directories 显式目录（相对全局根的完整路径）
+ * @returns           目录树根节点数组
  */
-export function buildFileTree(files: FileItem[]): TreeNode[] {
-  // 收集所有有 directory 的文件，按 directory 分组
-  // 同时保留无 directory 的文件作为顶层节点
+export function buildFileTree(files: FileItem[], directories: DirectoryItem[] = []): TreeNode[] {
   const rootChildren: TreeNode[] = [];
   // 用 Map 保存已创建的目录节点，key 为相对路径
   const dirNodeMap = new Map<string, TreeNode>();
 
-  // 确保 / 分隔符
-  const normalize = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '');
+  /**
+   * 确保 dirPath 及其所有祖先节点存在，返回最深层目录的 children 数组。
+   * 文件直接挂到这个数组里，省掉一次 findNode。
+   */
+  const ensureDirectory = (dirPath: string): TreeNode[] => {
+    // normalizePath 会折叠双斜杠/前导斜杠：Android SAF 某些 provider 会给出
+    // "dir//sub" 这类脏路径，若不归一，目录查找会和逐段拼接的路径对不上
+    const segments = normalizePath(dirPath).split('/').filter((s) => s.length > 0);
+    let currentPath = '';
+    let parentChildren = rootChildren;
+
+    for (const seg of segments) {
+      currentPath = currentPath ? `${currentPath}/${seg}` : seg;
+
+      let node = dirNodeMap.get(currentPath);
+      if (!node) {
+        node = {
+          name: seg,
+          path: currentPath,
+          isDirectory: true,
+          children: [],
+        };
+        dirNodeMap.set(currentPath, node);
+        parentChildren.push(node);
+      }
+      parentChildren = node.children;
+    }
+
+    return parentChildren;
+  };
+
+  // 先落显式目录：空目录、只含不支持文件的目录都能被表达出来
+  for (const dir of directories) {
+    ensureDirectory(dir.path);
+  }
 
   for (const file of files) {
-    const dir = file.directory ? normalize(file.directory) : '';
+    const dir = normalizePath(file.directory);
 
     if (!dir) {
       // 无目录 → 顶层文件节点
@@ -236,34 +270,8 @@ export function buildFileTree(files: FileItem[]): TreeNode[] {
       continue;
     }
 
-    // 确保 directory 路径的所有父级目录节点都已创建
-    const segments = dir.split('/').filter((s) => s.length > 0);
-    let currentPath = '';
-    let parentChildren = rootChildren;
-
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      currentPath = currentPath ? `${currentPath}/${seg}` : seg;
-
-      if (dirNodeMap.has(currentPath)) {
-        parentChildren = dirNodeMap.get(currentPath)!.children;
-        continue;
-      }
-
-      const node: TreeNode = {
-        name: seg,
-        path: currentPath,
-        isDirectory: true,
-        children: [],
-      };
-      dirNodeMap.set(currentPath, node);
-      parentChildren.push(node);
-      parentChildren = node.children;
-    }
-
-    // 在最深层目录中添加文件节点
-    const dirNode = dirNodeMap.get(dir)!;
-    dirNode.children.push({
+    const siblings = ensureDirectory(dir);
+    siblings.push({
       name: file.name,
       path: `${dir}/${file.name}`,
       isDirectory: false,
@@ -285,4 +293,16 @@ export function buildFileTree(files: FileItem[]): TreeNode[] {
   sortTree(rootChildren);
 
   return rootChildren;
+}
+
+/**
+ * 去掉文件节点，只留目录骨架。
+ *
+ * 侧栏树与「移动到…」都只需要目录：一个 5000 文件的库，目录节点通常只有几十到几百个，
+ * 剔掉文件后侧栏的 flatten 规模下降一个数量级（设计稿 §6.2「树只显示目录」）。
+ */
+export function stripFiles(nodes: TreeNode[]): TreeNode[] {
+  return nodes
+    .filter((node) => node.isDirectory)
+    .map((node) => ({ ...node, fileId: undefined, children: stripFiles(node.children) }));
 }

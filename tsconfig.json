@@ -5,6 +5,10 @@
     // 动态 import() 需要 esnext（默认 module 是 commonjs，会报 TS1323）。
     // metro 自己负责转译，这里只影响类型检查。
     "module": "esnext",
+    // 允许 import 带 .ts 后缀：纯函数 util 会被 scripts/*.mjs 在 Node 下直接跑，
+    // Node 的 strip-types 解析不了无扩展名导入
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]

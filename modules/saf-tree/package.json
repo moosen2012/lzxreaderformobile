@@ -1,0 +1,9 @@
+{
+  "name": "saf-tree",
+  "version": "0.2.0",
+  "description": "SAF 目录树列举（只读元数据），用于全深度目录导入",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

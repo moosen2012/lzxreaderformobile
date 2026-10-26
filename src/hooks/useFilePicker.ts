@@ -61,7 +61,112 @@ function pickFileWeb(): Promise<{ name: string; content: string; size: number } 
 
 export function useFilePicker() {
   const addFile = useReaderStore((state) => state.addFile);
+  const addFiles = useReaderStore((state) => state.addFiles);
   const openFile = useReaderStore((state) => state.openFile);
+
+  /**
+   * 多选文件导入（iOS 的"导入目录"替代路径，设计稿 §5.5）：
+   * iOS 系统没有目录选择器，DocumentPicker multiple:true 一次选多个文件，
+   * 全部落到"导入"挂载点根（directory: ''）。
+   */
+  const pickFiles = useCallback(async (): Promise<PickFileResult> => {
+    try {
+      // Web 平台：input multiple
+      if (Platform.OS === 'web') {
+        const picked = await new Promise<File[]>((resolve) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = WEB_ACCEPT;
+          input.multiple = true;
+
+          const cleanup = () => {
+            input.onchange = null;
+            input.oncancel = null;
+            input.remove();
+          };
+
+          input.onchange = () => {
+            const list = Array.from(input.files ?? []);
+            cleanup();
+            if (list.length === 0) resolve([]);
+            else resolve(list);
+          };
+          input.oncancel = () => {
+            cleanup();
+            resolve([]);
+          };
+          input.click();
+        }).catch(() => [] as File[]);
+
+        if (picked.length === 0) return { success: false, error: 'cancelled' };
+
+        const now = Date.now();
+        const items: FileItem[] = [];
+        for (const file of picked) {
+          if (isFileTooLarge(file.size)) continue;
+          try {
+            const content = await file.text();
+            items.push({
+              id: `web-${now}-${file.name}`,
+              name: file.name,
+              type: getFileType(file.name),
+              content,
+              uri: '',
+              size: file.size,
+              lastModified: file.lastModified || now,
+              addedAt: now,
+              directory: '',
+            });
+          } catch {
+            // 单个失败跳过
+          }
+        }
+        if (items.length === 0) return { success: false, error: '没有可导入的文件' };
+
+        addFiles(items);
+        return { success: true, file: items[0] };
+      }
+
+      // 原生平台（iOS 为主）：DocumentPicker 多选
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+      if (result.canceled) return { success: false, error: 'cancelled' };
+
+      const now = Date.now();
+      const items: FileItem[] = [];
+      for (const asset of result.assets ?? []) {
+        if (isFileTooLarge(asset.size)) continue;
+        try {
+          const content = await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          const permanentUri = await persistPickedFile({ uri: asset.uri, name: asset.name });
+          items.push({
+            id: `file-${asset.name}-${asset.size ?? content.length}`,
+            name: asset.name,
+            type: getFileType(asset.name),
+            content,
+            uri: permanentUri,
+            size: asset.size,
+            lastModified: asset.lastModified ?? now,
+            addedAt: now,
+            directory: '',
+          });
+        } catch {
+          // 单个失败跳过
+        }
+      }
+      if (items.length === 0) return { success: false, error: '没有可导入的文件' };
+
+      addFiles(items);
+      return { success: true, file: items[0] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      return { success: false, error: `文件选择失败: ${message}` };
+    }
+  }, [addFiles]);
 
   const pickFile = useCallback(async (): Promise<PickFileResult> => {
     try {
@@ -155,5 +260,5 @@ export function useFilePicker() {
     }
   }, [addFile, openFile]);
 
-  return { pickFile };
+  return { pickFile, pickFiles };
 }

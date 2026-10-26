@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { Theme } from '../../styles/themes';
 import type { CodeTheme, ThemeMode } from '../../types';
 import { CODE_THEME_OPTIONS } from '../../utils/markdownHelper';
+import { APP_NAME, APP_VERSION } from '../../utils/appVersion';
 
 interface SettingsPanelProps {
   visible: boolean;
@@ -190,6 +191,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </View>
 
             <View style={{ height: 24 }} />
+
+            {/* 版本标识：覆盖安装后一眼确认是不是新包 */}
+            <Text style={[styles.versionText, { color: theme.textTertiary }]}>
+              {APP_NAME} v{APP_VERSION}
+            </Text>
+            <View style={{ height: 16 }} />
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -303,5 +310,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
+  },
+  versionText: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
