@@ -19,6 +19,17 @@ interface BrowserShellProps {
    * 列表过宽、阅读区被压，配合正文限宽 780 后左右留白还会不均。
    */
   mainWidth?: number;
+  /**
+   * 全屏阅读（全屏 + L 档）：aside 独占整窗。
+   * 树宽度动画到 0 且不再渲染中栏列表 —— 此时用户是在"读"，不是"找"。
+   */
+  focusAside?: boolean;
+  /**
+   * 全屏阅读时收起目录树（M/E 档也有内联树）。
+   * 与 focusAside 分开的原因：M/E 档的 children 就是阅读器本身，
+   * 不能用 focusAside 那套"整块不渲染"，否则正文会一起消失。
+   */
+  hideSidebar?: boolean;
 }
 
 /**
@@ -31,23 +42,34 @@ interface BrowserShellProps {
  * - 宽屏收放的是 width，RN 不支持 native driver，只能用 JS 驱动；
  * - 窄屏收放的是 translateX，走原生线程，抽屉滑动不受 JS 线程影响。
  */
-export const BrowserShell: React.FC<BrowserShellProps> = ({ sidebar, children, aside, mainWidth }) => {
+export const BrowserShell: React.FC<BrowserShellProps> = ({
+  sidebar,
+  children,
+  aside,
+  mainWidth,
+  focusAside = false,
+  hideSidebar = false,
+}) => {
   // 宽屏侧栏 / 窄屏抽屉是两个状态：抽屉默认关闭，否则手机一启动就被盖住
   const sidebarOpen = useReaderStore((state) => state.sidebarOpen);
   const drawerOpen = useReaderStore((state) => state.drawerOpen);
   const setDrawerOpen = useReaderStore((state) => state.setDrawerOpen);
   const rightPane = useReaderStore((state) => state.rightPane);
   const closeReader = useReaderStore((state) => state.closeReader);
+  const readerFullscreen = useReaderStore((state) => state.readerFullscreen);
   const selectionMode = useReaderStore((state) => state.selectionMode);
   const exitSelectionMode = useReaderStore((state) => state.exitSelectionMode);
   const navigateToDir = useReaderStore((state) => state.navigateToDir);
   const currentDirPath = useReaderStore((state) => state.currentDirPath);
   const themeMode = useReaderStore((state) => state.theme);
+  const setReaderFullscreen = useReaderStore((state) => state.setReaderFullscreen);
   const { tier, sidebarWidth, drawerWidth } = useResponsiveLayout();
   const theme = getTheme(themeMode);
 
   const isWide = tier !== 'compact';
-  const visible = isWide ? sidebarOpen : drawerOpen;
+  // 全屏时目录树一律收起（宽屏是收起内联树，窄屏是收起抽屉）
+  const sidebarHidden = focusAside || hideSidebar;
+  const visible = sidebarHidden ? false : isWide ? sidebarOpen : drawerOpen;
 
   const widthAnim = useRef(new Animated.Value(sidebarOpen ? sidebarWidth : 0)).current;
   const drawerProgress = useRef(new Animated.Value(drawerOpen ? 1 : 0)).current;
@@ -55,25 +77,25 @@ export const BrowserShell: React.FC<BrowserShellProps> = ({ sidebar, children, a
   useEffect(() => {
     if (!isWide) return;
     Animated.timing(widthAnim, {
-      toValue: sidebarOpen ? sidebarWidth : 0,
+      toValue: sidebarOpen && !sidebarHidden ? sidebarWidth : 0,
       duration: ANIMATION_DURATION,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [sidebarOpen, isWide, sidebarWidth, widthAnim]);
+  }, [sidebarOpen, isWide, sidebarWidth, widthAnim, sidebarHidden]);
 
   useEffect(() => {
     if (isWide) return;
     Animated.timing(drawerProgress, {
-      toValue: drawerOpen ? 1 : 0,
+      toValue: drawerOpen && !sidebarHidden ? 1 : 0,
       duration: ANIMATION_DURATION,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [drawerOpen, isWide, drawerProgress]);
+  }, [drawerOpen, isWide, drawerProgress, sidebarHidden]);
 
   // 物理返回键逐级退（设计稿 §7.2）：
-  // 选择模式 → 抽屉（C 档）→ 阅读区 → 上一级目录 → 系统退出
+  // 选择模式 → 抽屉（C 档）→ 全屏阅读 → 阅读区 → 上一级目录 → 系统退出
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (selectionMode) {
@@ -82,6 +104,12 @@ export const BrowserShell: React.FC<BrowserShellProps> = ({ sidebar, children, a
       }
       if (!isWide && drawerOpen) {
         setDrawerOpen(false);
+        return true;
+      }
+      // 全屏必须先"退出全屏"，而不是直接退出阅读：
+      // 否则用户按返回键会一下跳回目录列表，感觉像是全屏没有退出口
+      if (rightPane === 'reader' && readerFullscreen) {
+        setReaderFullscreen(false);
         return true;
       }
       if (rightPane === 'reader') {
@@ -100,9 +128,11 @@ export const BrowserShell: React.FC<BrowserShellProps> = ({ sidebar, children, a
     isWide,
     drawerOpen,
     rightPane,
+    readerFullscreen,
     selectionMode,
     currentDirPath,
     setDrawerOpen,
+    setReaderFullscreen,
     closeReader,
     exitSelectionMode,
     navigateToDir,
@@ -135,8 +165,10 @@ export const BrowserShell: React.FC<BrowserShellProps> = ({ sidebar, children, a
         </Animated.View>
       ) : null}
 
-      {/* 三栏时中栏定宽（设计稿 320），阅读区吃剩余宽度 */}
-      <View style={mainWidth && aside ? { width: mainWidth } : styles.content}>{children}</View>
+      {/* 三栏时中栏定宽（设计稿 320），阅读区吃剩余宽度；全屏时中栏整体收起 */}
+      {focusAside ? null : (
+        <View style={mainWidth && aside ? { width: mainWidth } : styles.content}>{children}</View>
+      )}
 
       {/* L 档三栏：阅读器常驻右栏；窄档由 children 自行切换阅读/列表 */}
       {tier === 'large' && aside ? (

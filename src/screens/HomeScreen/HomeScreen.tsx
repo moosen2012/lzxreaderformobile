@@ -378,11 +378,18 @@ export const HomeScreen: React.FC = () => {
   ) : null;
 
   const isReading = rightPane === 'reader' && !!currentFileId;
+  const readerFullscreen = useReaderStore((state) => state.readerFullscreen);
 
-  // 沉浸阅读：只有"阅读器自己就是整屏"的档位才隐藏应用头。
-  // L 档三栏里应用头是唯一提供 paddingTop: insets.top 的地方，隐藏它会让左树/中栏顶到状态栏下，
-  // 同时丢掉面包屑与"···"入口 —— 所以 large 档必须保留（设计稿 §4.2 方向修正）
-  const isReadingFullscreen = isReading && tier !== 'large';
+  /**
+   * 全屏阅读：默认打开文件即全屏（偏好 autoFullscreenOnOpen），
+   * 全屏时应用头 / 侧栏 / 中栏列表 / 阅读器标题栏全部让位，正文独占整屏。
+   * 之前这里判断 `tier !== 'large'` —— L 档因为 AppHeader 是唯一提供 paddingTop 的地方
+   * 而不能隐藏。现在全屏时改由 ReaderContent 自己吃 insets.top，四档行为统一。
+   */
+  const isReadingFullscreen = isReading && readerFullscreen;
+
+  // L 档全屏：aside（阅读器）独占整窗，中栏列表与树一起收起
+  const focusAside = tier === 'large' && isReadingFullscreen;
 
   // L 档三栏：阅读器常驻右栏；未选文件时显示占位，不抢占列表宽度
   const readerPane = isReading ? (
@@ -391,6 +398,7 @@ export const HomeScreen: React.FC = () => {
         fileId={currentFileId!}
         onBack={closeReader}
         topInset={isReadingFullscreen ? insets.top : 0}
+        fullscreen={isReadingFullscreen}
       />
     </View>
   ) : null;
@@ -461,6 +469,8 @@ export const HomeScreen: React.FC = () => {
       <BrowserShell
         sidebar={<Sidebar theme={theme} />}
         mainWidth={tier === 'large' ? LIST_PANE_WIDTH : undefined}
+        focusAside={focusAside}
+        hideSidebar={isReadingFullscreen}
         aside={
           tier === 'large'
             ? readerPane ?? readerPlaceholder

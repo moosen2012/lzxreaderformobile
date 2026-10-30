@@ -114,17 +114,36 @@ $bt = Get-ChildItem "$env:ANDROID_HOME\build-tools" | Sort-Object Name -Descendi
 
 ## 七、本次打包记录
 
+- 日期：2026-10-30（第四次）
+- 版本：1.1.1（versionCode 10，未新增 git 提交，沿用持久化值）
+- 变更：
+  1. 修复正文无法滚动 —— 去掉包住滚动容器的 `Pressable`，改为 `useLongPressScroll` 挂在滚动容器自身的 `onTouch*` 上（长按唤出菜单的能力保留）
+  2. 修复 docx 报 `Property 'TextDecoder' doesn't exist` —— 新增 `utils/office/textDecoderPolyfill.ts`（UTF-8 / latin1 / utf-16le / utf-16be），两个引擎入口调用 `ensureTextDecoder()`
+  3. 修复 xlsx 表格中文变方块 —— 同上 polyfill 的多编码分支（SheetJS 用 `TextDecoder('latin1')` 做字节→二进制串）
+  4. 修复打开 PDF 闪退 —— 新增 `services/pdfSource.ts`，先把 `content://` 复制到 cache 再交给原生视图（绕开 react-native-pdf 对 URI 做 `decodeURIComponent` 破坏 SAF 树关系的问题）
+  5. 修复菜单版本号恒为 v1.0.0 —— `utils/appVersion.ts` 改为读 `app.json` 的 `expo.version`
+- 产物：`android\app\build\outputs\apk\release\app-release.apk`（87,910,582 B ≈ 83.8 MB）
+- 签名：V2，`CN=LZX Reader, OU=Mobile, O=LZX`（沿用 `android/app/release.keystore`，可直接 `adb install -r` 覆盖安装且保留已导入目录）
+- 方式：`gradlew.bat assembleRelease`，构建耗时 1 分 36 秒（仅 JS/TS 改动，未执行 prebuild）
+- 实测（模拟器 `Small_Phone`，Android 16 / x86_64）：
+  - `sample.xlsx` → 标题「员工表」+ 表头「姓名/部门/工号」+ 张三/李四/王五 + A001~A003，横向滑动正常
+  - `sample.docx` → 标题、中文正文、`&` 与 `<tag>`、列表项全部正确
+  - `sample.pdf`（SAF `content://`）→ `PDF fixture page 1` + 页码 `1 / 1 · sample.pdf`，logcat 无 FATAL/SecurityException
+  - 长文档（60 节 Markdown）→ 全屏下连续上滑从第 1 节到第 10 节；长按正文弹出阅读菜单；关闭菜单后继续滑动正常
+  - 菜单底部显示 `LZX Reader v1.1.1`
+- 校验：`npm run verify` 全绿（tsc + 9 个测试脚本 + eslint 0 error / 0 warning）
+
+### 上一次记录（第三次，2026-10-30）
+
+- 变更：全屏阅读（打开即全屏 + 长按菜单 + 状态栏隐藏 + 自动全屏开关）；新增 .docx（mammoth，BSD-2）/ .xlsx（SheetJS CE，Apache-2.0）/ .pdf（react-native-pdf，MIT）阅读
+- 产物：87,905,963 B ≈ 83.8 MB（体积增长来自两个新原生依赖与 JS 包内新增的 mammoth/xlsx）
+- 方式：`gradlew.bat assembleRelease`，构建耗时约 5.5 分钟（新原生依赖 react-native-pdf / react-native-blob-util / saf-tree readAsBase64 首次编译，未执行 prebuild，autolinking 自动接入）
+
+### 更早记录
+
 - 日期：2026-10-26（第二次）
 - 版本：1.1.1（versionCode 10）
 - 变更：目录导入进度浮层（阶段 + 实时计数 + 取消）、md 打开卡转圈修复（读取超时 + 原生优先 + loading 状态机）
 - 产物：`android\app\build\outputs\apk\release\app-release.apk`（67,684,799 B ≈ 64.5 MB）
 - 签名：V2，`CN=LZX Reader, OU=Mobile, O=LZX`（沿用 `android/app/release.keystore`，可直接覆盖安装）
 - 方式：`gradlew.bat assembleRelease`，构建耗时约 1 分钟（仅 JS/TS 改动，未执行 prebuild）
-
-### 上一次记录
-
-- 日期：2026-10-26
-- 版本：1.1.0（versionCode 9）
-- 产物：`android\app\build\outputs\apk\release\app-release.apk`（约 64.5 MB）
-- 签名：V2，`CN=LZX Reader, O=LZX`
-- 方式：`gradlew.bat assembleRelease`，构建耗时约 2 分钟

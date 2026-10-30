@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { useReaderStore } from '../store/readerStore';
 import { flushFileIndexNowAsync } from '../store/fileIndexSync';
-import { getFileType, isFileTooLarge, isSupportedFile } from '../utils/fileHelper';
+import { getFileType, isBinaryDocument, isFileTooLarge, isSupportedFile } from '../utils/fileHelper';
 import { scanDirectoryTree } from '../utils/directoryScanner';
 import { createSafLister, isSafTreeAvailable, SAF_TREE_MISSING_MESSAGE } from '../services/saf';
 import type {
@@ -122,13 +122,19 @@ export function useDirectoryImporter() {
           }
 
           const { name: rootName, files } = picked;
-          const supported = files.filter((f) => isSupportedFile(f.name));
+          /**
+           * web 端目录导入仍然只收文本：这里是一次性把每个文件读成 `file.text()`，
+           * 对 docx/xlsx 这类二进制会把字节解坏。Office 文档在 web 上走"单文件打开"那条路（会即时转换）。
+           */
+          const supported = files.filter((f) => isSupportedFile(f.name) && !isBinaryDocument(f.name));
           if (supported.length === 0) {
             return { success: false, error: '所选目录中没有支持的文件类型（md/txt/code 等）' };
           }
 
           const truncated = supported.length > MAX_WEB_FILES;
-          const candidates = supported.filter((f) => !isFileTooLarge(f.size)).slice(0, MAX_WEB_FILES);
+          const candidates = supported
+            .filter((f) => !isFileTooLarge(f.size, f.name))
+            .slice(0, MAX_WEB_FILES);
 
           // 目录集合从相对路径反推（web 侧拿不到空目录信息）
           const dirSet = new Set<string>();
@@ -246,7 +252,7 @@ export function useDirectoryImporter() {
         const scan = await scanDirectoryTree({
           rootName,
           listChildren: (documentId) => lister(documentId),
-          acceptFile: (name, size) => isSupportedFile(name) && !isFileTooLarge(size),
+          acceptFile: (name, size) => isSupportedFile(name) && !isFileTooLarge(size, name),
           maxFiles: MAX_IMPORT_FILES,
           maxDepth: MAX_IMPORT_DEPTH,
           concurrency: SCAN_CONCURRENCY,

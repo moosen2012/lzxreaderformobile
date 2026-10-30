@@ -29,6 +29,8 @@ interface SafTreeNativeModule {
   listChildren(treeUri: string, documentId: string | null): Promise<NativeSafEntry[]>;
   /** 0.2.0 起提供；旧安装包没有这个函数，读取要回退到 expo */
   readAsString?: (uri: string) => Promise<string>;
+  /** 0.3.0 起提供：docx / xlsx / pdf 等二进制文档用，返回 base64 */
+  readAsBase64?: (uri: string) => Promise<string>;
 }
 
 const nativeModule: SafTreeNativeModule | null =
@@ -118,6 +120,43 @@ export async function readTextFile(uri: string): Promise<string> {
   return withTimeout(
     FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.UTF8 }),
     READ_TIMEOUT_MS,
+    READ_TIMEOUT_MESSAGE
+  );
+}
+
+/**
+ * 二进制文档的读取超时。
+ *
+ * docx / xlsx / pdf 常见几 MB 到几十 MB，比文本慢一个数量级；
+ * 但仍必须有上限，理由和 `readTextFile` 一样：provider 卡住时不能永远转圈。
+ */
+const BINARY_READ_TIMEOUT_MS = 45000;
+
+/**
+ * 读取二进制文件，返回 base64（不是文本！）。
+ *
+ * 同样是原生优先：expo 的 `readAsStringAsync` 只认 `com.android.externalstorage`
+ * 这类 authority，Drive / OneDrive 的 content:// 会直接 IOException。
+ * Base64 是"能穿过 JS 边界的最小公共表示"，上层用 `utils/office/base64` 解成字节。
+ */
+export async function readBase64File(uri: string): Promise<string> {
+  const module = nativeModule;
+  const isContentUri = uri.startsWith('content://');
+
+  if (Platform.OS === 'android' && isContentUri && module?.readAsBase64) {
+    try {
+      return await withTimeout(module.readAsBase64(uri), BINARY_READ_TIMEOUT_MS, READ_TIMEOUT_MESSAGE);
+    } catch (nativeError) {
+      if (nativeError instanceof Error && nativeError.message === READ_TIMEOUT_MESSAGE) {
+        throw nativeError;
+      }
+      // 其余失败退回 expo：至少 file:// 与 externalstorage 这两类一定读得到
+    }
+  }
+
+  return withTimeout(
+    FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 }),
+    BINARY_READ_TIMEOUT_MS,
     READ_TIMEOUT_MESSAGE
   );
 }

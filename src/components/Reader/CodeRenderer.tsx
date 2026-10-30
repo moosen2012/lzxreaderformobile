@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import type { Theme } from '../../styles/themes';
 import type { CodeTheme } from '../../types';
+import type { ScrollTouchProps } from '../../hooks/useLongPressScroll';
 
 interface CodeRendererProps {
   content: string;
@@ -11,6 +12,8 @@ interface CodeRendererProps {
   theme: Theme;
   codeTheme: CodeTheme;
   isDark: boolean;
+  /** 长按唤出菜单（挂在 ScrollView 上，不抢 responder，滚动不受影响） */
+  scrollTouchProps?: ScrollTouchProps;
 }
 
 export const CodeRenderer: React.FC<CodeRendererProps> = ({
@@ -19,6 +22,7 @@ export const CodeRenderer: React.FC<CodeRendererProps> = ({
   theme,
   codeTheme,
   isDark,
+  scrollTouchProps,
 }) => {
   const [wordWrap, setWordWrap] = useState(false);
 
@@ -40,6 +44,7 @@ export const CodeRenderer: React.FC<CodeRendererProps> = ({
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        {...scrollTouchProps}
       >
         <View style={styles.content}>
           {codeBlock}

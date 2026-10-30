@@ -14,6 +14,7 @@ import type { Theme } from '../../styles/themes';
 import type { CodeTheme, ThemeMode } from '../../types';
 import { CODE_THEME_OPTIONS } from '../../utils/markdownHelper';
 import { APP_NAME, APP_VERSION } from '../../utils/appVersion';
+import { useReaderStore } from '../../store/readerStore';
 
 interface SettingsPanelProps {
   visible: boolean;
@@ -38,6 +39,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onFontSizeChange,
   onCodeThemeChange,
 }) => {
+  const autoFullscreenOnOpen = useReaderStore((state) => state.autoFullscreenOnOpen);
+  const setAutoFullscreenOnOpen = useReaderStore((state) => state.setAutoFullscreenOnOpen);
+
   return (
     <Modal
       visible={visible}
@@ -153,6 +157,31 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </View>
             </View>
 
+            {/* 阅读偏好 */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                阅读
+              </Text>
+              <View style={[styles.settingItem, { backgroundColor: theme.cardBackground }]}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="scan-outline" size={22} color={theme.primary} />
+                  <View style={styles.settingTextGroup}>
+                    <Text style={[styles.settingLabel, { color: theme.text }]}>
+                      打开文件自动全屏
+                    </Text>
+                    <Text style={[styles.settingHint, { color: theme.textTertiary }]}>
+                      全屏下长按正文可唤出菜单
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={autoFullscreenOnOpen}
+                  onValueChange={setAutoFullscreenOnOpen}
+                  trackColor={{ false: theme.surfaceAlt, true: theme.primary }}
+                />
+              </View>
+            </View>
+
             {/* 代码主题 */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
@@ -260,6 +289,12 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 16,
+  },
+  settingTextGroup: {
+    gap: 2,
+  },
+  settingHint: {
+    fontSize: 11,
   },
   fontSizeContainer: {
     flex: 1,

@@ -54,6 +54,11 @@ const EXTENSION_MAP: Record<string, FileType> = {
   '.erl': 'code',
   '.vim': 'code',
   '.dockerfile': 'code',
+  // 办公文档：二进制，打开时按需转换（见 utils/office）
+  '.docx': 'docx',
+  '.xlsx': 'xlsx',
+  '.xls': 'xlsx',
+  '.pdf': 'pdf',
 };
 
 // 文件扩展名到highlight.js语言名称的映射
@@ -158,12 +163,30 @@ export function formatDate(timestamp?: number): string {
   return `${year}-${month}-${day}`;
 }
 
-// 最大文件大小（10MB）
+// 最大文件大小（10MB）：文本文件的上限，超过这个体积的纯文本在手机上排版也会卡死
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// 检查文件大小是否超过限制
-export function isFileTooLarge(size?: number): boolean {
-  return !!size && size > MAX_FILE_SIZE;
+/**
+ * 二进制文档（docx / xlsx / pdf）的上限。
+ * 不能和文本用同一个阈值：一个 8MB 的 docx 里往往是几十张图片，转成正文后体积远小于原文件；
+ * 而文本的 10MB 上限是为了避免一次排版几十万行。
+ */
+export const MAX_BINARY_FILE_SIZE = 30 * 1024 * 1024;
+
+/** 是否是需要走二进制读取 + 解析的办公文档 */
+export function isBinaryDocument(fileName: string): boolean {
+  const type = getFileType(fileName);
+  return type === 'docx' || type === 'xlsx' || type === 'pdf';
+}
+
+/**
+ * 检查文件大小是否超过限制（按类型取不同阈值）。
+ * 传 fileName 才能判断办公文档；不传时按文本阈值处理（老调用点的行为不变）。
+ */
+export function isFileTooLarge(size?: number, fileName?: string): boolean {
+  if (!size) return false;
+  const limit = fileName && isBinaryDocument(fileName) ? MAX_BINARY_FILE_SIZE : MAX_FILE_SIZE;
+  return size > limit;
 }
 
 // 文件类型图标名称
@@ -173,6 +196,12 @@ export function getFileIconName(type: FileType): string {
       return 'logo-markdown';
     case 'code':
       return 'code-slash';
+    case 'docx':
+      return 'document-text';
+    case 'xlsx':
+      return 'grid';
+    case 'pdf':
+      return 'document';
     case 'text':
     default:
       return 'document-text';
@@ -186,6 +215,13 @@ export function getFileIconColor(type: FileType): string {
       return '#6C56F0';
     case 'code':
       return '#00B4D8';
+    case 'docx':
+      // Word 蓝 / Excel 绿 / PDF 红：让树上能一眼区分，而不是三个灰色文档图标
+      return '#2B579A';
+    case 'xlsx':
+      return '#217346';
+    case 'pdf':
+      return '#D93025';
     case 'text':
     default:
       return '#8E8E93';
@@ -201,6 +237,23 @@ const SUPPORTED_EXTENSIONS = new Set(Object.keys(EXTENSION_MAP));
 export function isSupportedFile(fileName: string): boolean {
   const ext = getExtension(fileName);
   return SUPPORTED_EXTENSIONS.has(ext);
+}
+
+/**
+ * 已知但明确不支持的办公格式，给一句能照做的提示。
+ *
+ * 单文件选择器不按类型过滤，用户完全可能选中 .doc / .pptx。
+ * 如果不拦，.doc 会按 text 类型打开，屏幕上就是一堆乱码 —— 比"直接说不支持"更糟。
+ */
+const UNSUPPORTED_OFFICE_HINT: Record<string, string> = {
+  '.doc': '旧版 .doc 暂不支持，请在 Word 里"另存为 .docx"后再打开',
+  '.ppt': '暂不支持 PowerPoint 文档（.ppt）',
+  '.pptx': '暂不支持 PowerPoint 文档（.pptx）',
+  '.pages': '暂不支持 Pages 文档，请先导出为 .docx 或 PDF',
+};
+
+export function getUnsupportedOfficeHint(fileName: string): string | null {
+  return UNSUPPORTED_OFFICE_HINT[getExtension(fileName)] ?? null;
 }
 
 /**

@@ -1,5 +1,10 @@
-// 文件类型
-export type FileType = 'markdown' | 'text' | 'code';
+/**
+ * 文件类型。
+ * - markdown / text / code：直接按文本读，原文渲染；
+ * - docx / xlsx：二进制，打开时按需转换（docx→Markdown、xlsx→Markdown 表格），转换结果仍走 MarkdownRenderer；
+ * - pdf：二进制且无法转成文本，交给原生 PDF 视图直接渲染 uri。
+ */
+export type FileType = 'markdown' | 'text' | 'code' | 'docx' | 'xlsx' | 'pdf';
 
 // 主题类型
 export type ThemeMode = 'light' | 'dark';
@@ -110,6 +115,14 @@ export interface ReaderState {
   selectedFileIds: string[];     // 批量移动/删除/收藏的文件
   selectedDirPaths: string[];    // 批量删除的目录（目录暂不支持跨目录移动：路径是虚拟的）
 
+  /**
+   * 本次阅读是否全屏（不持久化）：全屏时隐藏应用头 / 侧栏 / 列表 / 阅读器标题栏，
+   * 正文独占整屏。打开文件时由 autoFullscreenOnOpen 决定初值。
+   */
+  readerFullscreen: boolean;
+  /** 打开文件时是否自动进入全屏（持久化偏好，设置面板可关） */
+  autoFullscreenOnOpen: boolean;
+
   // Actions
   addFile: (file: FileItem) => void;
   addFiles: (files: FileItem[]) => void;  // 批量添加文件
@@ -155,6 +168,11 @@ export interface ReaderState {
   deleteNodes: (payload: { fileIds: string[]; dirPaths: string[] }) => void;
   /** 标记某个挂载点的授权是否失效（树上显示 ⚠，重新授权后清掉） */
   setMountInvalid: (mountId: string, invalid: boolean) => void;
+
+  // 全屏阅读
+  setReaderFullscreen: (fullscreen: boolean) => void;
+  toggleReaderFullscreen: () => void;
+  setAutoFullscreenOnOpen: (enabled: boolean) => void;
 }
 
 // 目录导入进度回调

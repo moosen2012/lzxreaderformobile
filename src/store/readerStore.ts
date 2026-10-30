@@ -47,6 +47,10 @@ export const useReaderStore = create<ReaderState>()(
       selectedFileIds: [],
       selectedDirPaths: [],
 
+      // 全屏阅读状态：readerFullscreen 是本次会话的瞬时状态，autoFullscreenOnOpen 是持久化偏好
+      readerFullscreen: false,
+      autoFullscreenOnOpen: true,
+
       /**
        * 添加或更新文件。
        * 注意：不再顺带把 currentFileId 指向它 —— 否则后台回填内容（updateFileContent 的旧实现）
@@ -164,6 +168,7 @@ export const useReaderStore = create<ReaderState>()(
           currentFileId: state.currentFileId === fileId ? null : state.currentFileId,
           // 正在读的文件被删掉时，右栏退回目录内容，避免停在"文件不存在"
           rightPane: state.currentFileId === fileId ? 'folder' : state.rightPane,
+          readerFullscreen: state.currentFileId === fileId ? false : state.readerFullscreen,
         }));
       },
 
@@ -218,13 +223,27 @@ export const useReaderStore = create<ReaderState>()(
           currentFileId: fileId,
           currentDirPath: file ? getFileDirectory(file) : state.currentDirPath,
           rightPane: 'reader',
+          // 打开即全屏：初值取用户偏好；用户全屏中又点了别的文件时保持全屏，不要突然弹回带头的界面
+          readerFullscreen: state.readerFullscreen || state.autoFullscreenOnOpen,
           recentFiles: [fileId, ...state.recentFiles.filter((id) => id !== fileId)].slice(0, 20),
         }));
       },
 
       /** 退出阅读：保留 currentFileId，只把右栏切回目录内容 */
       closeReader: () => {
-        set({ rightPane: 'folder' });
+        set({ rightPane: 'folder', readerFullscreen: false });
+      },
+
+      setReaderFullscreen: (fullscreen: boolean) => {
+        set({ readerFullscreen: fullscreen });
+      },
+
+      toggleReaderFullscreen: () => {
+        set((state) => ({ readerFullscreen: !state.readerFullscreen }));
+      },
+
+      setAutoFullscreenOnOpen: (enabled: boolean) => {
+        set({ autoFullscreenOnOpen: enabled });
       },
 
       setSidebarOpen: (open: boolean) => {
@@ -338,6 +357,7 @@ export const useReaderStore = create<ReaderState>()(
             recentFiles: state.recentFiles.filter((id) => !removedIds.has(id)),
             currentFileId: currentRemoved ? null : state.currentFileId,
             rightPane: currentRemoved ? 'folder' : state.rightPane,
+            readerFullscreen: currentRemoved ? false : state.readerFullscreen,
           };
         });
       },
@@ -375,7 +395,10 @@ export const useReaderStore = create<ReaderState>()(
           browserView: state.browserView,
           sortKey: state.sortKey,
           sortAsc: state.sortAsc,
-          // rightPane 故意不持久化：重启后应停在目录列表，而不是内容还没回填的空白阅读器
+          // 阅读偏好：打开文件是否自动全屏
+          autoFullscreenOnOpen: state.autoFullscreenOnOpen,
+          // rightPane / readerFullscreen 故意不持久化：重启后应停在目录列表，
+          // 而不是内容还没回填的空白阅读器（全屏态同理，需要一个可退出的入口）
         };
         if (Platform.OS === 'web') return { ...preferences, files: state.files };
         return preferences;

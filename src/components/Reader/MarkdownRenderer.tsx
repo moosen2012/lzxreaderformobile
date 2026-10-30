@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   StyleSheet,
   View,
+  type TextStyle,
   type ViewStyle,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
@@ -9,10 +10,12 @@ import {
 import Markdown, { Renderer } from 'react-native-marked';
 import type { Theme } from '../../styles/themes';
 import type { CodeTheme } from '../../types';
+import type { ScrollTouchProps } from '../../hooks/useLongPressScroll';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
 import { MermaidBlock } from '../MermaidBlock/MermaidBlock';
 import { MathBlock, isInlineMathNode } from '../MathBlock/MathBlock';
 import { preprocessMarkdown, INLINE_MATH_MARKER } from '../../utils/markdownPreprocess';
+import { decodeEntities } from '../../utils/htmlEntities';
 
 interface MarkdownRendererProps {
   content: string;
@@ -21,6 +24,12 @@ interface MarkdownRendererProps {
   codeTheme: CodeTheme;
   isDark: boolean;
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /**
+   * 长按唤出菜单用的触摸回调。
+   * 必须挂到内层 FlatList 上：外面套 Pressable 会抢 responder，
+   * 直接让列表滚不动（Android 上 blockNativeResponder 会截断原生滚动）。
+   */
+  scrollTouchProps?: ScrollTouchProps;
 }
 
 /** 含行内公式的段落需要横向流式排版，否则公式会被挤到单独一行 */
@@ -99,6 +108,20 @@ class CustomRenderer extends Renderer {
   }
 
   /**
+   * marked 会把正文里的 `&` `<` `>` 转义成 `&amp;` `&lt;` `&gt;`，
+   * 而默认的 `text()` / `html()` 只是把字符串塞进 `<Text>`，不会解码 ——
+   * 结果"a & b"在屏幕上显示成"a &amp; b"（docx 转过来的文档几乎必现）。
+   * 这里在最后一层把实体还原回字符。
+   */
+  override text(text: string | React.ReactNode[], styles?: TextStyle): React.ReactNode {
+    return super.text(typeof text === 'string' ? decodeEntities(text) : text, styles);
+  }
+
+  override html(text: string | React.ReactNode[], styles?: TextStyle): React.ReactNode {
+    return super.html(typeof text === 'string' ? decodeEntities(text) : text, styles);
+  }
+
+  /**
    * 段落里一旦有行内公式，就把默认的纵向布局切成横向流式布局，
    * 这样"设 f(x) 为..."这类句子的文字和公式就能排在同一行。
    */
@@ -119,6 +142,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   codeTheme,
   isDark,
   onScroll,
+  scrollTouchProps,
 }) => {
   const processedContent = useMemo(() => preprocessMarkdown(content), [content]);
 
@@ -294,6 +318,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       theme={userTheme}
       renderer={renderer}
       flatListProps={{
+        ...scrollTouchProps,
         onScroll,
         scrollEventThrottle: 32,
         contentContainerStyle: { padding: 16 },

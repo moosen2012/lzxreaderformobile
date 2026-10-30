@@ -10,8 +10,17 @@ import { getTheme } from './src/styles/themes';
 
 export default function App() {
   const themeMode = useReaderStore((state) => state.theme);
+  const readerFullscreen = useReaderStore((state) => state.readerFullscreen);
+  const rightPane = useReaderStore((state) => state.rightPane);
   const theme = getTheme(themeMode);
   const [indexReady, setIndexReady] = useState(false);
+
+  /**
+   * 全屏阅读时连状态栏一起隐藏 —— 正文真正占满整块屏幕。
+   * 只在"右栏确实是阅读器"时隐藏：退出阅读（回目录）后状态栏必须立刻回来，
+   * 否则用户在文件列表里看不到时间/电量，会以为是系统卡了。
+   */
+  const immersive = readerFullscreen && rightPane === 'reader';
 
   /**
    * 原生平台的文件索引来自 `documentDirectory/library/index.json`（见 store/fileIndexSync）。
@@ -31,7 +40,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} hidden={immersive} />
         {indexReady ? (
           <AppNavigator />
         ) : (
