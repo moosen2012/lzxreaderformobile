@@ -36,6 +36,12 @@ yarn-error.*
 android/
 ios/
 
+# 例外：自定义 Expo 原生模块的源码必须入库（否则全新 clone 无法构建 SAF 模块）
+# 只放行 modules/*/android 下的源码，build 产物仍然忽略
+!/modules/*/android/
+/modules/*/android/build/
+/modules/*/android/.gradle/
+
 # Typescript
 *.tsbuildinfo
 
